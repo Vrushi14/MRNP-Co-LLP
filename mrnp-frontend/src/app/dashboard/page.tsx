@@ -1,0 +1,2209 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { apiClient, authService } from '@/utils/api';
+import { useRouter } from 'next/navigation';
+import {
+  Sun,
+  Moon,
+  TrendingUp,
+  Briefcase,
+  Users,
+  MapPin,
+  Mail,
+  Trash2,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  CheckSquare,
+  Square,
+  ArrowUpDown,
+  Send,
+  Clock,
+  UserCheck,
+  Plus,
+  Bell,
+  Calendar
+} from 'lucide-react';
+
+import SecuritySettings from '@/components/dashboard/SecuritySettings';
+import NotificationCenter from '@/components/dashboard/NotificationCenter';
+import InterviewScheduler from '@/components/dashboard/InterviewScheduler';
+import DashboardWidgets from '@/components/dashboard/DashboardWidgets';
+
+
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'applications' | 'jobs' | 'analytics' | 'profile' | 'interviews' | 'notifications'>('analytics');
+  const router = useRouter();
+
+  // Theme support
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  // Mobile sidebar
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Profile fields state
+  const [editing, setEditing] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileError, setProfileError] = useState('');
+
+  // Notifications and Interviews states
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<any[]>([]);
+
+
+  // Applications state
+  const [applications, setApplications] = useState<any[]>([]);
+  const [filteredApps, setFilteredApps] = useState<any[]>([]);
+  const [appsLoading, setAppsLoading] = useState(true);
+  const [appsError, setAppsError] = useState('');
+
+  // Filters state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedPos, setSelectedPos] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedExp, setSelectedExp] = useState('');
+
+  // Dropdown list unique options
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [positions, setPositions] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [experiences, setExperiences] = useState<string[]>([]);
+
+  // Detailed Modal/Drawer state
+  const [selectedApp, setSelectedApp] = useState<any | null>(null);
+  const [adminStatus, setAdminStatus] = useState<'Pending' | 'Under Review' | 'Shortlisted' | 'Rejected'>('Pending');
+  const [adminNotes, setAdminNotes] = useState('');
+
+  // Email Automation State
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState<'interview' | 'rejection' | 'offer'>('interview');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailHistory, setEmailHistory] = useState<any[]>([]);
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState('');
+  const [emailErrorMessage, setEmailErrorMessage] = useState('');
+
+  // Table Enhancements
+  const [selectedAppIds, setSelectedAppIds] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Statistics
+  const [stats, setStats] = useState({
+    total: 0,
+    recent24h: 0,
+    uniqueDepts: 0,
+    uniqueCities: 0
+  });
+
+  // Job Openings state
+  const [jobsList, setJobsList] = useState<any[]>([]);
+  const [jobsListLoading, setJobsListLoading] = useState(false);
+  const [jobsListError, setJobsListError] = useState('');
+  const [jobPosting, setJobPosting] = useState(false);
+  const [jobPostError, setJobPostError] = useState('');
+  const [jobPostSuccess, setJobPostSuccess] = useState('');
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+  // New Job form state
+  const [newJobDept, setNewJobDept] = useState('');
+  const [newJobPosition, setNewJobPosition] = useState('');
+  const [newJobCity, setNewJobCity] = useState('');
+  const [newJobState, setNewJobState] = useState('');
+  const [newJobDescription, setNewJobDescription] = useState('');
+  const [newJobRequirements, setNewJobRequirements] = useState('');
+
+  // Theme Sync on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('mrnp_theme');
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (systemDark ? 'dark' : 'light');
+    setTheme(initialTheme as any);
+    if (initialTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    localStorage.setItem('mrnp_theme', nextTheme);
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Verify auth and fetch profile + applications
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!authService.isAuthenticated()) {
+        router.push('/auth/login');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch profile
+        const profileResponse = await apiClient.user.getProfile();
+        setUser(profileResponse.user);
+        setProfileName(profileResponse.user.name);
+        setProfileEmail(profileResponse.user.email);
+
+        // Fetch applications
+        await loadApplications();
+        
+        // Fetch job openings list
+        await loadJobs();
+
+        // Fetch notifications
+        await loadNotifications();
+
+        // Fetch interviews
+        await loadInterviews();
+      } catch (err: any) {
+        setProfileError(err.message || 'Failed to load profile details.');
+      } finally {
+        setLoading(false);
+      }
+
+    };
+
+    fetchDashboardData();
+  }, [router]);
+
+  const loadApplications = async () => {
+    try {
+      setAppsLoading(true);
+      setAppsError('');
+      const response = await apiClient.careers.getApplications();
+      const appList = response.applications || [];
+      setApplications(appList);
+
+      // Extract unique options dynamically
+      const uniqueDepts: string[] = Array.from(new Set(appList.map((a: any) => a.jobDepartment || a.job_department).filter(Boolean)));
+      const uniquePositions: string[] = Array.from(new Set(appList.map((a: any) => a.jobPosition || a.job_position).filter(Boolean)));
+      const uniqueCities: string[] = Array.from(new Set(appList.map((a: any) => a.jobCity || a.job_city).filter(Boolean)));
+      const uniqueExperiences: string[] = Array.from(new Set(appList.map((a: any) => a.experience).filter(Boolean)));
+
+      setDepartments(uniqueDepts.sort());
+      setPositions(uniquePositions.sort());
+      setCities(uniqueCities.sort());
+      setExperiences(uniqueExperiences.sort());
+
+      calculateStats(appList);
+    } catch (err: any) {
+      setAppsError(err.message || 'Failed to load applications.');
+    } finally {
+      setAppsLoading(false);
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const res = await apiClient.notifications.getAll();
+      setNotifications(res.notifications || []);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+    }
+  };
+
+  const loadInterviews = async () => {
+    try {
+      const res = await apiClient.interviews.getAll();
+      setInterviews(res.interviews || []);
+    } catch (err) {
+      console.error('Failed to load interviews', err);
+    }
+  };
+
+  const calculateStats = (appList: any[]) => {
+
+    const total = appList.length;
+
+    // Recent in last 24h
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const recent24h = appList.filter((a: any) => {
+      const dateStr = a.createdAt || a.created_at;
+      return dateStr && new Date(dateStr).getTime() > oneDayAgo;
+    }).length;
+
+    const depts = new Set(appList.map((a: any) => a.jobDepartment || a.job_department).filter(Boolean)).size;
+    const citiesCount = new Set(appList.map((a: any) => a.jobCity || a.job_city).filter(Boolean)).size;
+
+    setStats({
+      total,
+      recent24h,
+      uniqueDepts: depts,
+      uniqueCities: citiesCount
+    });
+  };
+
+  // Perform search, filtering, and sorting
+  useEffect(() => {
+    let filtered = [...applications];
+
+    // Search query match
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(a => 
+        (a.name && a.name.toLowerCase().includes(q)) ||
+        (a.email && a.email.toLowerCase().includes(q)) ||
+        (a.education && a.education.toLowerCase().includes(q)) ||
+        (a.currentCompany && a.currentCompany.toLowerCase().includes(q)) ||
+        (a.current_company && a.current_company.toLowerCase().includes(q)) ||
+        (a.phone && a.phone.includes(q))
+      );
+    }
+
+    // Department match
+    if (selectedDept) {
+      filtered = filtered.filter(a => (a.jobDepartment || a.job_department) === selectedDept);
+    }
+
+    // Position match
+    if (selectedPos) {
+      filtered = filtered.filter(a => (a.jobPosition || a.job_position) === selectedPos);
+    }
+
+    // City match
+    if (selectedCity) {
+      filtered = filtered.filter(a => (a.jobCity || a.job_city) === selectedCity);
+    }
+
+    // Experience match
+    if (selectedExp) {
+      filtered = filtered.filter(a => String(a.experience) === String(selectedExp));
+    }
+
+    // Apply Sorting
+    filtered.sort((a, b) => {
+      let valA = a[sortField] || '';
+      let valB = b[sortField] || '';
+
+      // Fallbacks
+      if (sortField === 'status') {
+        const idA = a.id || a._id;
+        const idB = b.id || b._id;
+        valA = localStorage.getItem(`mrnp_status_${idA}`) || 'Pending';
+        valB = localStorage.getItem(`mrnp_status_${idB}`) || 'Pending';
+      }
+
+      if (sortField === 'jobDepartment') {
+        valA = a.jobDepartment || a.job_department || '';
+        valB = b.jobDepartment || b.job_department || '';
+      }
+
+      if (sortField === 'jobPosition') {
+        valA = a.jobPosition || a.job_position || '';
+        valB = b.jobPosition || b.job_position || '';
+      }
+
+      if (sortField === 'experience') {
+        valA = Number(a.experience) || 0;
+        valB = Number(b.experience) || 0;
+      }
+
+      if (sortField === 'createdAt') {
+        valA = new Date(a.createdAt || a.created_at || 0).getTime();
+        valB = new Date(b.createdAt || b.created_at || 0).getTime();
+      }
+
+      if (typeof valA === 'string') {
+        return sortOrder === 'asc' 
+          ? valA.localeCompare(valB as string) 
+          : (valB as string).localeCompare(valA);
+      } else {
+        return sortOrder === 'asc' 
+          ? (valA as number) - (valB as number) 
+          : (valB as number) - (valA as number);
+      }
+    });
+
+    setFilteredApps(filtered);
+    setCurrentPage(1); // Reset to first page when filtering/sorting changes
+  }, [searchQuery, selectedDept, selectedPos, selectedCity, selectedExp, applications, sortField, sortOrder]);
+
+  // Open Details Modal and fetch status/notes + email history
+  const openAppDetails = async (app: any) => {
+    setSelectedApp(app);
+    const appId = app.id || app._id;
+    const savedStatus = localStorage.getItem(`mrnp_status_${appId}`);
+    const savedNotes = localStorage.getItem(`mrnp_notes_${appId}`);
+    setAdminStatus((savedStatus as any) || 'Pending');
+    setAdminNotes(savedNotes || '');
+
+    // Fetch Email correspondence history for this candidate
+    try {
+      const response = await apiClient.emails.getHistory(appId);
+      setEmailHistory(response.emailLogs || []);
+    } catch (err) {
+      console.error('Failed to load email logs', err);
+      setEmailHistory([]);
+    }
+  };
+
+  // Persist status/notes modifications in local storage
+  const saveAdminData = () => {
+    if (!selectedApp) return;
+    const appId = selectedApp.id || selectedApp._id;
+    localStorage.setItem(`mrnp_status_${appId}`, adminStatus);
+    localStorage.setItem(`mrnp_notes_${appId}`, adminNotes);
+    
+    // Update active applications list local statuses
+    const updated = applications.map(a => {
+      if ((a.id || a._id) === appId) {
+        return { ...a, localStatus: adminStatus };
+      }
+      return a;
+    });
+    setApplications(updated);
+    
+    // Close modal
+    setSelectedApp(null);
+  };
+
+  // Manage Openings functions
+  const loadJobs = async () => {
+    try {
+      setJobsListLoading(true);
+      setJobsListError('');
+      const response = await apiClient.jobs.getAll();
+      setJobsList(response.jobs || []);
+    } catch (err: any) {
+      setJobsListError(err.message || 'Failed to load job openings.');
+    } finally {
+      setJobsListLoading(false);
+    }
+  };
+
+  const resetJobForm = () => {
+    setNewJobDept('');
+    setNewJobPosition('');
+    setNewJobCity('');
+    setNewJobState('');
+    setNewJobDescription('');
+    setNewJobRequirements('');
+    setJobPostError('');
+    setJobPostSuccess('');
+  };
+
+  const handlePostJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newJobDept.trim() || !newJobPosition.trim() || !newJobCity.trim() || !newJobState.trim()) {
+      setJobPostError('Department, Position, City, and State are required.');
+      return;
+    }
+    try {
+      setJobPosting(true);
+      setJobPostError('');
+      setJobPostSuccess('');
+      const requirementsArray = newJobRequirements
+        .split('\n')
+        .map(r => r.trim())
+        .filter(Boolean);
+      await apiClient.jobs.create({
+        department: newJobDept.trim(),
+        position: newJobPosition.trim(),
+        city: newJobCity.trim(),
+        state: newJobState.trim(),
+        description: newJobDescription.trim(),
+        requirements: requirementsArray,
+      });
+      setJobPostSuccess('Job opening published successfully!');
+      resetJobForm();
+      await loadJobs();
+    } catch (err: any) {
+      setJobPostError(err.message || 'Failed to post job opening.');
+    } finally {
+      setJobPosting(false);
+    }
+  };
+
+  const handleDeleteJob = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this job opening? This cannot be undone.')) return;
+    try {
+      setDeletingJobId(id);
+      await apiClient.jobs.delete(id);
+      setJobsList(prev => prev.filter(j => (j._id || j.id) !== id));
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete job opening.');
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedDept('');
+    setSelectedPos('');
+    setSelectedCity('');
+    setSelectedExp('');
+  };
+
+  const handleLogout = () => {
+    authService.removeToken();
+    router.push('/');
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError('');
+
+    try {
+      const response = await apiClient.user.updateProfile(profileName, profileEmail);
+      setUser(response.user);
+      setEditing(false);
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to update profile information.');
+    }
+  };
+
+  // CSV exporting helpers
+  const exportToCSV = (customRows?: any[], filenameSuffix?: string) => {
+    const headers = [
+      'ID',
+      'Name',
+      'Email',
+      'Phone',
+      'Education',
+      'Current Company',
+      'Experience',
+      'Job Department',
+      'Job Position',
+      'Job City',
+      'Status',
+      'Admin Notes',
+      'Submitted At'
+    ];
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '';
+      const stringVal = String(val);
+      if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n') || stringVal.includes('\r')) {
+        return `"${stringVal.replace(/"/g, '""')}"`;
+      }
+      return stringVal;
+    };
+
+    const targetList = customRows || filteredApps;
+
+    const rows = targetList.map(a => {
+      const appId = a.id || a._id;
+      const status = localStorage.getItem(`mrnp_status_${appId}`) || 'Pending';
+      const notes = localStorage.getItem(`mrnp_notes_${appId}`) || '';
+      return [
+        appId,
+        a.name,
+        a.email,
+        a.phone,
+        a.education,
+        a.currentCompany || a.current_company || '',
+        a.experience,
+        a.jobDepartment || a.job_department,
+        a.jobPosition || a.job_position,
+        a.jobCity || a.job_city,
+        status,
+        notes,
+        a.createdAt || a.created_at ? new Date(a.createdAt || a.created_at).toISOString() : ''
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(escapeCSV).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `mrnp_job_applications_${filenameSuffix || new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'Shortlisted':
+        return 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50';
+      case 'Rejected':
+        return 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50';
+      case 'Under Review':
+        return 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50';
+      default:
+        return 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50';
+    }
+  };
+
+  // Helper to build resume full links
+  const getResumeUrl = (resumePath: string) => {
+    if (!resumePath) return '#';
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${resumePath}`;
+  };
+
+  // Sorting Handler
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  // Checkbox row selections
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      const pageItemIds = paginatedApps.map(a => a.id || a._id);
+      setSelectedAppIds(prev => Array.from(new Set([...prev, ...pageItemIds])));
+    } else {
+      const pageItemIds = paginatedApps.map(a => a.id || a._id);
+      setSelectedAppIds(prev => prev.filter(id => !pageItemIds.includes(id)));
+    }
+  };
+
+  const handleSelectRow = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedAppIds(prev => [...prev, id]);
+    } else {
+      setSelectedAppIds(prev => prev.filter(item => item !== id));
+    }
+  };
+
+  // Bulk options operations
+  const handleBulkDelete = () => {
+    if (selectedAppIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedAppIds.length} candidate applications? This is a simulation and will remove them from the active display list.`)) return;
+
+    // Simulate bulk deletion in local state
+    const remainingApps = applications.filter(a => !selectedAppIds.includes(a.id || a._id));
+    setApplications(remainingApps);
+    setSelectedAppIds([]);
+    alert('Simulated bulk deletion complete.');
+  };
+
+  const handleBulkExport = () => {
+    const selectedApps = applications.filter(a => selectedAppIds.includes(a.id || a._id));
+    exportToCSV(selectedApps, 'bulk_selected');
+  };
+
+  // Email Automation: Loading template structure on selection change
+  useEffect(() => {
+    if (!selectedApp) return;
+    const name = selectedApp.name || 'Candidate';
+    const position = selectedApp.jobPosition || selectedApp.job_position || 'Open Role';
+
+    if (emailTemplate === 'interview') {
+      setEmailSubject(`Interview Schedule Request: MRNP & Co. - ${position}`);
+      setEmailBody(`Dear ${name},
+
+Thank you for your interest in the ${position} position at MRNP & Co.
+
+We were highly impressed with your academic profile and professional qualifications. We would love to invite you for an initial round of technical interview via Google Meet.
+
+Please let us know your availability during this week (Monday to Friday between 10:00 AM and 5:00 PM).
+
+Warm regards,
+MRNP Hiring Operations`);
+    } else if (emailTemplate === 'rejection') {
+      setEmailSubject(`Application Status Update: MRNP & Co. - ${position}`);
+      setEmailBody(`Dear ${name},
+
+Thank you for taking the time to discuss the ${position} role with us at MRNP & Co.
+
+We appreciate the effort and dedication you put into submitting your application. We had many qualified candidates apply, and after careful assessment, we regret to inform you that we will not be moving forward with your application at this time.
+
+We will keep your resume in our database for future active openings that may fit your background.
+
+We wish you the very best in your search.
+
+Sincerely,
+MRNP Talent Team`);
+    } else if (emailTemplate === 'offer') {
+      setEmailSubject(`Job Offer: ${position} at MRNP & Co. - Congratulations!`);
+      setEmailBody(`Dear ${name},
+
+We are absolutely delighted to offer you the position of ${position} with MRNP & Co.!
+
+Your strong capabilities and experience make you an ideal addition to our premium professional advisory team. 
+
+Please find attached an official outline of your job responsibilities, compensation structure, and start date variables. We'd appreciate it if you could confirm your acceptance by replying to this email within the next 48 hours.
+
+We are excited about the prospect of welcoming you to the MRNP family.
+
+With warm regards,
+MRNP Managing Partners`);
+    }
+  }, [emailTemplate, selectedApp]);
+
+  // Submit automated email sending to backend
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedApp) return;
+    const appId = selectedApp.id || selectedApp._id;
+
+    try {
+      setSendingEmail(true);
+      setEmailSuccessMessage('');
+      setEmailErrorMessage('');
+
+      const response = await apiClient.emails.send({
+        applicantId: appId,
+        recipientEmail: selectedApp.email,
+        subject: emailSubject,
+        body: emailBody,
+        type: emailTemplate
+      });
+
+      setEmailSuccessMessage('Email dispatched successfully! View history below.');
+      
+      // Add local status shifting based on email selection
+      let newStatus = adminStatus;
+      if (emailTemplate === 'interview') newStatus = 'Under Review';
+      if (emailTemplate === 'rejection') newStatus = 'Rejected';
+      if (emailTemplate === 'offer') newStatus = 'Shortlisted';
+      setAdminStatus(newStatus);
+      localStorage.setItem(`mrnp_status_${appId}`, newStatus);
+
+      // Refresh applications local list state
+      const updated = applications.map(a => {
+        if ((a.id || a._id) === appId) {
+          return { ...a, localStatus: newStatus };
+        }
+        return a;
+      });
+      setApplications(updated);
+
+      // Reload communication history
+      const historyResponse = await apiClient.emails.getHistory(appId);
+      setEmailHistory(historyResponse.emailLogs || []);
+      
+      setShowEmailModal(false);
+    } catch (err: any) {
+      setEmailErrorMessage(err.message || 'Failed to send automated email.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  // Pagination indexing calculations
+  const totalPages = Math.ceil(filteredApps.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedApps = filteredApps.slice(startIndex, startIndex + itemsPerPage);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground transition-all duration-300">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primaryBlue"></div>
+          <p className="font-forum tracking-widest text-lg animate-pulse">MRNP SECURITY CONTEXT...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Aggregate stats for custom charts
+  const deptCounts = applications.reduce((acc: any, curr: any) => {
+    const dept = curr.jobDepartment || curr.job_department || 'Other';
+    acc[dept] = (acc[dept] || 0) + 1;
+    return acc;
+  }, {});
+
+  const experienceDistribution = applications.reduce((acc: any, curr: any) => {
+    const exp = Number(curr.experience) || 0;
+    if (exp === 0) acc['Fresher'] = (acc['Fresher'] || 0) + 1;
+    else if (exp > 0 && exp <= 3) acc['1-3 Years'] = (acc['1-3 Years'] || 0) + 1;
+    else if (exp > 3 && exp <= 5) acc['3-5 Years'] = (acc['3-5 Years'] || 0) + 1;
+    else acc['5+ Years'] = (acc['5+ Years'] || 0) + 1;
+    return acc;
+  }, { 'Fresher': 0, '1-3 Years': 0, '3-5 Years': 0, '5+ Years': 0 });
+
+  // Dummy monthly / weekly trend generation incorporating live stats
+  const hiringTrendData = [
+    { label: 'Mon', count: Math.ceil(stats.total * 0.1) || 1 },
+    { label: 'Tue', count: Math.ceil(stats.total * 0.15) || 2 },
+    { label: 'Wed', count: Math.ceil(stats.total * 0.2) || 3 },
+    { label: 'Thu', count: Math.ceil(stats.total * 0.12) || 1 },
+    { label: 'Fri', count: Math.ceil(stats.total * 0.23) || 4 },
+    { label: 'Sat', count: Math.ceil(stats.total * 0.08) || 1 },
+    { label: 'Sun', count: stats.recent24h || 1 }
+  ];
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row antialiased transition-all duration-300">
+      
+      {/* Mobile Top Navbar with collapse burger */}
+      <header className="md:hidden flex justify-between items-center p-4 bg-cardBg border-b border-borderCustom shadow-sm z-30">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-primaryBlue text-white flex items-center justify-center font-forum text-base font-bold shadow-md shadow-[#061143]/20">
+            M
+          </div>
+          <div>
+            <h2 className="font-forum text-sm tracking-wider font-bold">MRNP & Co.</h2>
+            <span className="text-[8px] uppercase tracking-widest text-slate-500 font-semibold block">Admin Workspace</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setActiveTab('notifications'); setIsMobileOpen(false); }}
+            className="relative p-2 rounded-lg bg-background hover:bg-slate-100 dark:hover:bg-slate-800 transition text-foreground cursor-pointer"
+            title="Notifications"
+          >
+            <Bell size={18} />
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></span>
+            )}
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg bg-background hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            title="Toggle Theme"
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} className="text-amber-400" />}
+          </button>
+          <button
+            onClick={() => setIsMobileOpen(!isMobileOpen)}
+            className="p-2 rounded-lg bg-background hover:bg-slate-100 dark:hover:bg-slate-800 transition text-foreground"
+          >
+            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </header>
+
+
+      {/* Side-menu Navigation panel */}
+      <aside 
+        className={`fixed inset-y-0 left-0 transform ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:relative md:translate-x-0 z-40 w-72 bg-cardBg border-r border-borderCustom p-6 flex flex-col justify-between shrink-0 transition-transform duration-300 ease-in-out`}
+      >
+        <div>
+          {/* Sidebar Logo Header */}
+          <div className="hidden md:flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primaryBlue flex items-center justify-center shadow-lg shadow-[#061143]/25 font-forum text-xl font-bold tracking-widest text-white transition-all duration-300">
+                M
+              </div>
+              <div>
+                <h2 className="font-forum text-lg tracking-wider font-bold">MRNP & Co.</h2>
+                <span className="text-[10px] uppercase text-slate-500 tracking-widest font-semibold block font-mono">Workspace Shell</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className="relative p-2 rounded-lg bg-background hover:bg-slate-100 dark:hover:bg-slate-800 border border-borderCustom text-foreground hover:scale-105 transition-all duration-300 cursor-pointer"
+                title="Notifications"
+              >
+                <Bell size={16} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full border border-cardBg animate-pulse"></span>
+                )}
+              </button>
+
+              {/* Dark mode switcher in sidebar */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-background hover:bg-slate-100 dark:hover:bg-slate-800 border border-borderCustom text-foreground hover:scale-105 transition-all duration-300"
+                title={theme === 'light' ? 'Enable Dark Mode' : 'Enable Light Mode'}
+              >
+                {theme === 'light' ? <Moon size={16} /> : <Sun size={16} className="text-amber-400" />}
+              </button>
+            </div>
+
+          </div>
+
+          {/* Logged in User Profile Info Summary */}
+          <div className="mb-6 p-4 rounded-xl bg-background/50 border border-borderCustom flex items-center gap-3 shadow-inner">
+            <div className="w-10 h-10 rounded-full bg-primaryBlue flex items-center justify-center text-white font-bold uppercase shadow-sm">
+              {user?.name?.substring(0, 2) || 'AD'}
+            </div>
+            <div className="overflow-hidden">
+              <h3 className="font-bold text-xs truncate">{user?.name}</h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+            </div>
+          </div>
+
+          {/* Navigation Items list */}
+          <nav className="space-y-1.5">
+            <button
+              onClick={() => { setActiveTab('analytics'); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'analytics'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <TrendingUp size={18} />
+              Analytics Dashboard
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('jobs'); loadJobs(); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'jobs'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Users size={18} />
+              Manage Openings
+              {jobsList.length > 0 && (
+                <span className="ml-auto bg-primaryBlue/10 dark:bg-slate-800 text-primaryBlue text-[10px] font-bold px-2 py-0.5 rounded-full border border-primaryBlue/20">
+                  {jobsList.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('applications'); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'applications'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Briefcase size={18} />
+              Applications
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('interviews'); loadInterviews(); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'interviews'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Calendar size={18} />
+              Interview Scheduler
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('notifications'); loadNotifications(); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'notifications'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Bell size={18} />
+              Notifications & Logs
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="ml-auto bg-primaryBlue/10 dark:bg-slate-800 text-primaryBlue text-[10px] font-bold px-2 py-0.5 rounded-full border border-primaryBlue/20">
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('profile'); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'profile'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Users size={18} />
+              Account Profile
+            </button>
+
+          </nav>
+        </div>
+
+        {/* Sidebar Footer Logout */}
+        <button
+          onClick={handleLogout}
+          className="mt-8 flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border border-transparent hover:border-rose-100 dark:hover:border-rose-900/30 transition-all duration-200 cursor-pointer"
+        >
+          <X size={18} />
+          System Logout
+        </button>
+      </aside>
+
+      {/* Screen Backdrop for Mobile Navigation toggled */}
+      {isMobileOpen && (
+        <div 
+          onClick={() => setIsMobileOpen(false)}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 md:hidden"
+        ></div>
+      )}
+
+      {/* Main Workspace Frame container */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full transition-all duration-300">
+        
+        {activeTab === 'jobs' ? (
+          /* ========== JOB OPENINGS MANAGEMENT TAB ========== */
+          <div>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Manage Job Openings</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Publish new roles and manage live openings visible to prospective candidates.</p>
+              </div>
+              <button
+                onClick={loadJobs}
+                className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom shadow-sm flex items-center gap-2 self-start cursor-pointer hover:border-primaryBlue/30 transition"
+              >
+                <Plus size={14} />
+                Refresh List
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+
+              {/* Form card left */}
+              <div className="xl:col-span-2">
+                <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm sticky top-4">
+                  <h2 className="text-base md:text-lg font-forum font-bold text-primaryBlue mb-1 flex items-center gap-2">
+                    <Plus size={18} className="text-primaryBlue" />
+                    Post New Position
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mb-4 dark:text-slate-400">Provide details below. Roles appear instantly in career portal pathways.</p>
+
+                  {jobPostError && (
+                    <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 text-rose-700 dark:text-rose-400 text-xs flex items-start gap-2">
+                      {jobPostError}
+                    </div>
+                  )}
+
+                  {jobPostSuccess && (
+                    <div className="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs flex items-start gap-2">
+                      {jobPostSuccess}
+                    </div>
+                  )}
+
+                  <form onSubmit={handlePostJob} className="space-y-3.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Department *</label>
+                        <input
+                          type="text"
+                          value={newJobDept}
+                          onChange={e => setNewJobDept(e.target.value)}
+                          placeholder="e.g. Tax"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Position *</label>
+                        <input
+                          type="text"
+                          value={newJobPosition}
+                          onChange={e => setNewJobPosition(e.target.value)}
+                          placeholder="e.g. Tax Consultant"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">City *</label>
+                        <input
+                          type="text"
+                          value={newJobCity}
+                          onChange={e => setNewJobCity(e.target.value)}
+                          placeholder="e.g. Vadodara"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">State *</label>
+                        <input
+                          type="text"
+                          value={newJobState}
+                          onChange={e => setNewJobState(e.target.value)}
+                          placeholder="e.g. Gujarat"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Job Description</label>
+                      <textarea
+                        rows={3}
+                        value={newJobDescription}
+                        onChange={e => setNewJobDescription(e.target.value)}
+                        placeholder="Describe the role and its core key metrics..."
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Requirements & Responsibilities</label>
+                      <textarea
+                        rows={4}
+                        value={newJobRequirements}
+                        onChange={e => setNewJobRequirements(e.target.value)}
+                        placeholder={`Strong CA/MBA credentials\nOver 3 years of advisory skills\nFluent in client interactions`}
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs font-mono text-foreground placeholder:text-slate-400 resize-none"
+                      />
+                      <p className="text-[9px] text-slate-400 mt-1 dark:text-slate-500">Provide one requirement per line (becomes a bullet list).</p>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={jobPosting}
+                        className="flex-1 bg-primaryBlue hover:opacity-90 disabled:opacity-50 text-white font-semibold text-xs py-2.5 px-4 rounded-full shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {jobPosting ? 'Publishing...' : 'Publish Job Opening'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetJobForm}
+                        className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-full border border-borderCustom transition cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              {/* Active Openings list right */}
+              <div className="xl:col-span-3">
+                <div className="bg-cardBg border border-borderCustom rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 bg-background border-b border-borderCustom flex items-center justify-between">
+                    <h2 className="text-sm md:text-base font-forum font-bold text-primaryBlue flex items-center gap-2">
+                      <Briefcase size={16} className="text-primaryBlue" />
+                      Active Job Postings
+                    </h2>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{jobsList.length} postings live</span>
+                  </div>
+
+                  {jobsListError && (
+                    <div className="p-4 text-rose-700 text-xs bg-rose-50 border-b border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30">{jobsListError}</div>
+                  )}
+
+                  {jobsListLoading ? (
+                    <div className="p-12 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue mx-auto mb-3"></div>
+                      <p className="text-slate-400 text-xs">Querying database postings...</p>
+                    </div>
+                  ) : jobsList.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <h3 className="font-forum font-bold text-slate-500 text-base mb-1">No Active Openings</h3>
+                      <p className="text-xs text-slate-400">Post a role using the side form to present opportunities.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-borderCustom">
+                      {jobsList.map((job: any) => {
+                        const jobId = job._id || job.id;
+                        const isDeleting = deletingJobId === jobId;
+                        return (
+                          <div key={jobId} className="p-4 hover:bg-background/40 transition group">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-primaryBlue/5 text-primaryBlue border border-primaryBlue/10">
+                                    {job.department}
+                                  </span>
+                                  <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 border border-emerald-100 dark:border-emerald-900/30">
+                                    LIVE
+                                  </span>
+                                </div>
+                                <h3 className="font-bold text-sm group-hover:text-primaryBlue transition font-forum">{job.position}</h3>
+                                <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span className="flex items-center gap-1">
+                                    <MapPin size={12} className="text-slate-400" />
+                                    {job.city}, {job.state}
+                                  </span>
+                                </div>
+                                {job.description && (
+                                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">{job.description}</p>
+                                )}
+                              </div>
+
+                              <button
+                                onClick={() => handleDeleteJob(jobId)}
+                                disabled={isDeleting}
+                                className="shrink-0 p-2 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/40 text-rose-600 transition disabled:opacity-40 cursor-pointer"
+                                title="Remove posting"
+                              >
+                                <Trash2 size={14} className="text-rose-600" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        ) : activeTab === 'analytics' ? (
+          /* ========== ADVANCED ANALYTICS DASHBOARD TAB ========== */
+          <div>
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Metrics & Analytics Overview</h1>
+              <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Review detailed charts, candidate distribution matrices, and hiring trajectories.</p>
+            </div>
+
+            {/* Dashboard Widgets */}
+            <DashboardWidgets
+              applications={applications}
+              interviews={interviews}
+              setActiveTab={setActiveTab}
+              openAppDetails={openAppDetails}
+            />
+
+            {/* Grid for Charts */}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              
+              {/* Chart 1: Hiring Trend (SVG Area Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-primaryBlue" />
+                  Hiring Trend & Applications Volume
+                </h3>
+                <div className="relative h-60 w-full flex items-end">
+                  {/* SVG Chart */}
+                  <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="gradientTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--primary-blue)" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="var(--primary-blue)" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    {/* Grid Lines */}
+                    <line x1="0" y1="50" x2="500" y2="50" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    <line x1="0" y1="100" x2="500" y2="100" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    <line x1="0" y1="150" x2="500" y2="150" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    
+                    {/* Path Drawing */}
+                    <path
+                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60"
+                      fill="none"
+                      stroke="var(--primary-blue)"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                    />
+                    
+                    {/* Gradient Fill under Path */}
+                    <path
+                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60 L 500,200 Z"
+                      fill="url(#gradientTrend)"
+                    />
+                    
+                    {/* Hotspots / Circles */}
+                    <circle cx="71" cy="160" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="142" cy="120" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="213" cy="150" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="284" cy="80" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="355" cy="140" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="426" cy="110" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="500" cy="60" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                  </svg>
+                </div>
+                
+                {/* Custom X Axis Labels */}
+                <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1 font-mono uppercase font-bold">
+                  {hiringTrendData.map((d, i) => (
+                    <span key={i}>{d.label}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart 2: Department-wise Distribution (Donut Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Users size={16} className="text-primaryBlue" />
+                  Department Applications Ratio
+                </h3>
+                <div className="flex flex-col sm:flex-row items-center justify-around gap-6 h-60">
+                  {/* SVG Donut Circle */}
+                  <div className="relative w-40 h-40">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      {/* Background circle ring */}
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--border-color)" strokeWidth="8" />
+                      
+                      {/* Segment rings (simulated breakdown of standard IT, Tax, Audit, HR) */}
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="0" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="80" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="140" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ec4899" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="200" />
+                    </svg>
+                    {/* Inside metrics total display */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold font-forum">{stats.total}</span>
+                      <span className="text-[9px] uppercase tracking-widest text-slate-400 font-semibold">Total</span>
+                    </div>
+                  </div>
+
+                  {/* Legends list */}
+                  <div className="flex-1 space-y-2 max-w-[200px] w-full text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block"></span>
+                        IT / Technology
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['IT'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span>
+                        Audit & Assurance
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['Audit'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-amber-50 inline-block bg-amber-500"></span>
+                        Tax Advisory
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['Tax'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-pink-500 inline-block"></span>
+                        HR & Admin
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['HR'] || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart 3: Candidate Experience breakdown (Sleek Bar Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-primaryBlue" />
+                  Candidate Experience Distribution
+                </h3>
+                <div className="h-60 flex flex-col justify-between pt-4">
+                  {Object.entries(experienceDistribution).map(([label, count]: any) => {
+                    const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                    return (
+                      <div key={label} className="space-y-1">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span>{label}</span>
+                          <span className="text-slate-400 font-mono">{count} applicants ({Math.round(pct)}%)</span>
+                        </div>
+                        <div className="w-full h-3.5 bg-background border border-borderCustom rounded-full overflow-hidden">
+                          <div 
+                            style={{ width: `${Math.max(pct, 5)}%` }}
+                            className="h-full bg-gradient-to-r from-primaryBlue to-[#60a5fa] rounded-full transition-all duration-1000"
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Chart 4: Monthly Hiring Activity (Horizontal Bar visual) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Clock size={16} className="text-primaryBlue" />
+                  Monthly Pipeline Trends
+                </h3>
+                
+                <div className="relative h-60 w-full flex items-end justify-between px-2 pt-6">
+                  {/* Grid background lines */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                  </div>
+
+                  {/* Vertical Bars */}
+                  {[
+                    { label: 'Jan', val: 12 },
+                    { label: 'Feb', val: 18 },
+                    { label: 'Mar', val: 26 },
+                    { label: 'Apr', val: 14 },
+                    { label: 'May', val: stats.total || 8 }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col items-center gap-2 z-10 w-[14%]">
+                      <span className="text-[10px] font-bold font-mono text-primaryBlue">{item.val}</span>
+                      <div 
+                        style={{ height: `${Math.max((item.val / 30) * 150, 20)}px` }}
+                        className="w-full bg-primaryBlue/10 border border-primaryBlue/20 hover:bg-primaryBlue/20 rounded-t-lg transition-all duration-500"
+                      ></div>
+                      <span className="text-[10px] font-bold text-slate-400 font-mono">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        ) : activeTab === 'applications' ? (
+          /* ========== MAIN APPLICATIONS PIPELINE TAB ========== */
+          <div>
+            
+            {/* Main top welcome bar */}
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Job Applications Dashboard</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Review details, manage documents, and automate hiring communication.</p>
+              </div>
+
+              {/* Sync controls */}
+              <div className="flex gap-2 self-start flex-wrap font-instrument">
+                <button
+                  onClick={loadApplications}
+                  className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom transition flex items-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <Clock size={14} className="text-slate-500" />
+                  Sync Database
+                </button>
+                <button
+                  onClick={() => exportToCSV()}
+                  disabled={filteredApps.length === 0}
+                  className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2.5 px-5 rounded-full shadow-sm transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <Download size={14} className="text-white" />
+                  Export All (CSV)
+                </button>
+              </div>
+            </div>
+
+            {/* Stunning dashboard widgets section */}
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 font-instrument">
+              {/* Widget 1: Total candidates */}
+              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center gap-4 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-primaryBlue/5 rounded-full blur-2xl"></div>
+                <div className="p-2.5 bg-primaryBlue/5 dark:bg-slate-800 text-primaryBlue rounded-lg">
+                  <Briefcase size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold">Total Candidates</p>
+                  <h3 className="text-2xl font-forum font-bold text-primaryBlue mt-0.5">{stats.total}</h3>
+                </div>
+              </div>
+
+              {/* Widget 2: Upcoming Interviews */}
+              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center gap-4 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl"></div>
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 rounded-lg">
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold">Under Review</p>
+                  <h3 className="text-2xl font-forum font-bold text-primaryBlue mt-0.5">
+                    {applications.filter(a => localStorage.getItem(`mrnp_status_${a.id || a._id}`) === 'Under Review').length}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Widget 3: Top Location */}
+              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center gap-4 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl"></div>
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-950/20 text-amber-500 rounded-lg">
+                  <MapPin size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold">Primary City</p>
+                  <h3 className="text-xl font-forum font-bold text-primaryBlue mt-0.5 truncate max-w-[140px]">
+                    {cities[0] || 'Vadodara'}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Widget 4: Quick Actions */}
+              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group">
+                <div className="w-full">
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold mb-1">Quick Action</p>
+                  <button 
+                    onClick={() => { setActiveTab('jobs'); loadJobs(); }}
+                    className="w-full py-1.5 px-3 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white dark:bg-slate-800 text-primaryBlue text-[11px] font-bold rounded-lg border border-primaryBlue/10 transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    Post New Job Role
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Filtering Control panel */}
+            <section className="bg-cardBg border border-borderCustom p-5 rounded-xl shadow-sm mb-6 font-instrument">
+              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Filter size={16} className="text-primaryBlue" />
+                Advanced Filters & Query Search
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* Search textbox */}
+                <input
+                  type="text"
+                  placeholder="Search name, education, info..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                />
+
+                {/* Department drop */}
+                <select
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground cursor-pointer"
+                >
+                  <option value="">All Departments</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+
+                {/* Position select */}
+                <select
+                  value={selectedPos}
+                  onChange={(e) => setSelectedPos(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground cursor-pointer"
+                >
+                  <option value="">All Positions</option>
+                  {positions.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+
+                {/* City select */}
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground cursor-pointer"
+                >
+                  <option value="">All Cities</option>
+                  {cities.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                {/* Experience filter */}
+                <select
+                  value={selectedExp}
+                  onChange={(e) => setSelectedExp(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground cursor-pointer"
+                >
+                  <option value="">All Experience</option>
+                  {experiences.map((exp) => (
+                    <option key={exp} value={exp}>{exp} Years</option>
+                  ))}
+                </select>
+              </div>
+
+              {(searchQuery || selectedDept || selectedPos || selectedCity || selectedExp) && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={resetFilters}
+                    className="text-xs text-primaryBlue hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    Clear Filter Criteria
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* Applications Table Card */}
+            <section className="bg-cardBg border border-borderCustom rounded-xl shadow-sm overflow-hidden relative">
+              
+              {/* Floating bulk actions toolbar panel */}
+              {selectedAppIds.length > 0 && (
+                <div className="absolute top-0 left-0 right-0 bg-primaryBlue text-white px-6 py-3 flex items-center justify-between z-20 animate-slide-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold font-mono px-2 py-0.5 bg-white/20 rounded">
+                      {selectedAppIds.length}
+                    </span>
+                    <span className="text-xs font-semibold">candidates selected</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleBulkExport}
+                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-xs py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Download size={12} />
+                      Export CSV
+                    </button>
+                    <button
+                      onClick={handleBulkDelete}
+                      className="bg-rose-500 hover:bg-rose-600 text-white font-semibold text-xs py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Trash2 size={12} />
+                      Delete Selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedAppIds([])}
+                      className="text-xs text-white/80 hover:text-white underline font-semibold transition cursor-pointer"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {appsError && (
+                <div className="p-4 bg-rose-50 dark:bg-rose-955 border-b border-rose-250 text-rose-700 dark:text-rose-400 text-xs">{appsError}</div>
+              )}
+
+              {appsLoading ? (
+                <div className="p-16 text-center text-slate-400 text-xs">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue mx-auto mb-3"></div>
+                  Querying database applications...
+                </div>
+              ) : filteredApps.length === 0 ? (
+                <div className="p-16 text-center text-slate-400 flex flex-col items-center gap-3">
+                  <Briefcase size={36} className="text-slate-350" />
+                  <h3 className="font-forum font-bold text-slate-650 text-base">No Applications Found</h3>
+                  <p className="text-xs text-slate-400">Modify filters to broaden your search criteria.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-background text-primaryBlue font-bold border-b border-borderCustom font-instrument sticky top-0 bg-opacity-95 backdrop-blur-sm z-10 select-none">
+                        <th className="py-3.5 px-4 w-12 text-center">
+                          <input
+                            type="checkbox"
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-primaryBlue focus:ring-primaryBlue cursor-pointer"
+                            checked={
+                              paginatedApps.length > 0 &&
+                              paginatedApps.every(a => selectedAppIds.includes(a.id || a._id))
+                            }
+                            onChange={handleSelectAll}
+                          />
+                        </th>
+                        <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('name')}>
+                          <div className="flex items-center gap-1.5">
+                            Candidate Name
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('jobDepartment')}>
+                          <div className="flex items-center gap-1.5">
+                            Department / Role
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('jobCity')}>
+                          <div className="flex items-center gap-1.5">
+                            City Location
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('experience')}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            Exp.
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('status')}>
+                          <div className="flex items-center gap-1.5">
+                            Pipeline Status
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition" onClick={() => handleSort('createdAt')}>
+                          <div className="flex items-center gap-1.5">
+                            Applied
+                            <ArrowUpDown size={12} className="text-slate-400" />
+                          </div>
+                        </th>
+                        <th className="py-3.5 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-borderCustom">
+                      {paginatedApps.map((app) => {
+                        const appId = app.id || app._id;
+                        const status = localStorage.getItem(`mrnp_status_${appId}`) || 'Pending';
+                        const isSelected = selectedAppIds.includes(appId);
+                        
+                        return (
+                          <tr
+                            key={appId}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition duration-150 border-b border-borderCustom ${
+                              isSelected ? 'bg-primaryBlue/5 dark:bg-primaryBlue/10' : ''
+                            }`}
+                          >
+                            {/* Checkbox select */}
+                            <td className="py-4 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                className="w-3.5 h-3.5 rounded border-slate-300 text-primaryBlue focus:ring-primaryBlue cursor-pointer"
+                                checked={isSelected}
+                                onChange={(e) => handleSelectRow(appId, e.target.checked)}
+                              />
+                            </td>
+
+                            {/* Name info */}
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-primaryBlue/10 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-primaryBlue">
+                                  {app.name ? app.name[0].toUpperCase() : 'C'}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-foreground hover:text-primaryBlue transition">{app.name}</h4>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[140px]">{app.email}</p>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Department / Position */}
+                            <td className="py-4 px-4">
+                              <div>
+                                <span className="inline-block px-1.5 py-0.5 text-[8px] uppercase font-bold text-primaryBlue bg-primaryBlue/5 dark:bg-slate-800 rounded border border-primaryBlue/10 mb-0.5">
+                                  {app.jobDepartment || app.job_department}
+                                </span>
+                                <h5 className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">{app.jobPosition || app.job_position}</h5>
+                              </div>
+                            </td>
+
+                            {/* City */}
+                            <td className="py-4 px-4 font-medium text-slate-700 dark:text-slate-300">
+                              {app.jobCity || app.job_city}
+                            </td>
+
+                            {/* Experience */}
+                            <td className="py-4 px-4 text-center font-mono font-medium">
+                              {app.experience} yrs
+                            </td>
+
+                            {/* Pipeline Status */}
+                            <td className="py-4 px-4">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadgeClass(status)}`}>
+                                {status}
+                              </span>
+                            </td>
+
+                            {/* Applied Date */}
+                            <td className="py-4 px-4 text-[10px] text-slate-400">
+                              {app.createdAt || app.created_at
+                                ? new Date(app.createdAt || app.created_at).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })
+                                : 'N/A'}
+                            </td>
+
+                            {/* Actions buttons */}
+                            <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
+                              <a
+                                href={getResumeUrl(app.resumePath || app.resume_path)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center p-2 rounded-lg bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white dark:bg-slate-800 text-primaryBlue border border-primaryBlue/10 transition duration-150 cursor-pointer"
+                                title="Download Resume Attachment"
+                              >
+                                <Download size={12} />
+                              </a>
+
+                              <button
+                                onClick={() => openAppDetails(app)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cardBg hover:bg-primaryBlue hover:text-white border border-borderCustom text-foreground font-semibold text-[10px] transition duration-150 cursor-pointer shadow-sm"
+                              >
+                                Review Details
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Table pagination controller panel footer */}
+              {!appsLoading && filteredApps.length > 0 && (
+                <div className="px-6 py-4 bg-background border-t border-borderCustom flex flex-col sm:flex-row items-center justify-between gap-4 select-none font-instrument text-xs">
+                  <div className="text-slate-400">
+                    Showing <span className="font-bold text-foreground">{startIndex + 1}</span> to{' '}
+                    <span className="font-bold text-foreground">{Math.min(startIndex + itemsPerPage, filteredApps.length)}</span> of{' '}
+                    <span className="font-bold text-foreground">{filteredApps.length}</span> applicants
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg border border-borderCustom bg-cardBg hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg border text-xs font-bold transition cursor-pointer ${
+                          currentPage === page
+                            ? 'bg-primaryBlue text-white border-primaryBlue'
+                            : 'border-borderCustom bg-cardBg hover:bg-background'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg border border-borderCustom bg-cardBg hover:bg-background disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        ) : activeTab === 'interviews' ? (
+          /* ========== INTERVIEW SCHEDULER TAB ========== */
+          <div>
+            <InterviewScheduler />
+          </div>
+        ) : activeTab === 'notifications' ? (
+          /* ========== NOTIFICATIONS & LOGS TAB ========== */
+          <div>
+            <NotificationCenter />
+          </div>
+        ) : (
+          
+          /* ========== USER ADMINISTRATOR PROFILE TAB ========== */
+
+          <div className="max-w-xl mx-auto font-instrument">
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-forum font-bold text-primaryBlue">Admin Account Settings</h1>
+              <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Manage credentials and local workspace properties.</p>
+            </div>
+
+            <div className="bg-cardBg border border-borderCustom rounded-xl p-6 relative overflow-hidden shadow-sm">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primaryBlue/5 rounded-full blur-3xl"></div>
+
+              {profileError && (
+                <div className="bg-rose-50 border border-rose-250 text-rose-700 p-3 rounded-lg mb-6 text-xs">{profileError}</div>
+              )}
+
+              {!editing ? (
+                <div className="space-y-6">
+                  {/* Visual avatar summary */}
+                  <div className="flex items-center gap-4 pb-5 border-b border-borderCustom">
+                    <div className="w-14 h-14 rounded-full bg-primaryBlue/10 flex items-center justify-center text-primaryBlue text-xl font-bold uppercase shadow-sm">
+                      {user?.name?.substring(0, 2) || 'AD'}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold font-forum">{user?.name}</h2>
+                      <span className="text-[10px] text-primaryBlue font-semibold uppercase tracking-wider block">Super Administrator</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-slate-450 text-[10px] uppercase font-bold tracking-wider">Access Name</p>
+                      <p className="text-sm font-bold mt-0.5">{user?.name}</p>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-450 text-[10px] uppercase font-bold tracking-wider">Credential Email</p>
+                      <p className="text-sm font-bold mt-0.5 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm transition flex items-center gap-2 cursor-pointer"
+                    >
+                      Modify Settings
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">Access Name</label>
+                    <input
+                      type="text"
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">Access Email Address</label>
+                    <input
+                      type="email"
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="submit"
+                      className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm transition cursor-pointer"
+                    >
+                      Save Configuration
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(false);
+                        setProfileName(user?.name);
+                        setProfileEmail(user?.email);
+                        setProfileError('');
+                      }}
+                      className="bg-cardBg hover:bg-background text-foreground border border-borderCustom font-semibold text-xs py-2 px-5 rounded-full transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Security Change Password Settings */}
+            <SecuritySettings />
+          </div>
+        )}
+
+      </main>
+
+      {/* Slide-over review drawer card */}
+      {selectedApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end font-instrument">
+          {/* Backdrop screen glass shading */}
+          <div
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity"
+            onClick={() => { setSelectedApp(null); setShowEmailModal(false); }}
+          ></div>
+
+          {/* Drawer Body Container */}
+          <div className="relative w-full max-w-lg h-full bg-cardBg border-l border-borderCustom p-5 md:p-6 flex flex-col justify-between overflow-y-auto shadow-2xl z-10 animate-slide-in">
+            
+            <div>
+              {/* Header inside drawer */}
+              <div className="flex justify-between items-start pb-4 border-b border-borderCustom mb-5">
+                <div>
+                  <span className="text-[9px] tracking-widest uppercase font-bold text-primaryBlue">Candidate Profile review</span>
+                  <h2 className="text-xl font-forum font-bold text-primaryBlue mt-0.5">{selectedApp.name}</h2>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{selectedApp.email}</p>
+                </div>
+                <button
+                  onClick={() => { setSelectedApp(null); setShowEmailModal(false); }}
+                  className="p-1.5 rounded-full bg-background hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Data entry info sheets */}
+              <div className="space-y-4 text-xs">
+                
+                {/* Contact information details */}
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-wider text-primaryBlue font-bold mb-2">Contact Details</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-background border border-borderCustom p-2.5 rounded shadow-sm">
+                      <p className="text-[9px] text-slate-400 font-semibold uppercase">Mobile Phone</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedApp.phone}</p>
+                    </div>
+                    <div className="bg-background border border-borderCustom p-2.5 rounded shadow-sm">
+                      <p className="text-[9px] text-slate-400 font-semibold uppercase">Email Address</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 truncate select-all">{selectedApp.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Job specifics */}
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-wider text-primaryBlue font-bold mb-2">Target Role</h3>
+                  <div className="bg-background border border-borderCustom p-3 rounded-lg space-y-2.5 shadow-sm">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-semibold uppercase">Department</p>
+                        <p className="font-bold text-primaryBlue mt-0.5">{selectedApp.jobDepartment || selectedApp.job_department}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-semibold uppercase">City Location</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedApp.jobCity || selectedApp.job_city}</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-borderCustom pt-2">
+                      <p className="text-[9px] text-slate-400 font-semibold uppercase">Applied Position</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedApp.jobPosition || selectedApp.job_position}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Academic & Experience */}
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-wider text-primaryBlue font-bold mb-2">Qualifications</h3>
+                  <div className="bg-background border border-borderCustom p-3 rounded-lg space-y-2 shadow-sm">
+                    <div>
+                      <p className="text-[9px] text-slate-400 font-semibold uppercase">Education Level</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedApp.education}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 border-t border-borderCustom pt-2">
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-semibold uppercase">Experience</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{selectedApp.experience} Years</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-slate-400 font-semibold uppercase">Current Employer</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 truncate">{selectedApp.currentCompany || selectedApp.current_company || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Document Downloads */}
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-wider text-primaryBlue font-bold mb-2">Resume Attachment</h3>
+                  <a
+                    href={getResumeUrl(selectedApp.resumePath || selectedApp.resume_path)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-primaryBlue/5 hover:bg-primaryBlue/10 border border-primaryBlue/10 text-primaryBlue font-medium transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Download size={14} className="text-primaryBlue" />
+                      <span className="text-[11px] font-bold truncate max-w-[200px]">Download_Resume_Document.pdf</span>
+                    </div>
+                    <span className="text-[11px] underline">Open Attachment</span>
+                  </a>
+                </div>
+
+                {/* Automation trigger tools */}
+                <div className="border-t border-borderCustom pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-forum font-bold text-primaryBlue">Hiring Automation Workflows</h3>
+                    
+                    {/* Send Email Automation Trigger */}
+                    <button
+                      onClick={() => setShowEmailModal(true)}
+                      className="py-1 px-3 bg-primaryBlue hover:opacity-90 text-white font-semibold text-[10px] rounded-full shadow-sm transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Mail size={12} />
+                      Automate Email
+                    </button>
+                  </div>
+
+                  {/* Standard Decision variables */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Update Pipeline Status</label>
+                      <select
+                        value={adminStatus}
+                        onChange={(e) => setAdminStatus(e.target.value as any)}
+                        className="w-full px-3 py-1.5 bg-background border border-borderCustom text-foreground text-xs rounded"
+                      >
+                        <option value="Pending">Pending (Default)</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Shortlisted">Shortlisted</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] text-slate-400 uppercase font-bold mb-1">Administrative Comments</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Enter review findings or comments..."
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-borderCustom text-foreground text-xs rounded resize-none focus:border-primaryBlue focus:outline-none"
+                    ></textarea>
+                  </div>
+                </div>
+
+                {/* Dynamic correspondence logs log */}
+                <div className="border-t border-borderCustom pt-4">
+                  <h3 className="text-[10px] uppercase tracking-wider text-primaryBlue font-bold mb-2 flex items-center gap-1">
+                    <Clock size={12} />
+                    Correspondence Log History
+                  </h3>
+                  {emailHistory.length === 0 ? (
+                    <p className="text-[10px] text-slate-450 italic">No automated outreach correspondence logged yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-36 overflow-y-auto">
+                      {emailHistory.map((log: any, idx: number) => (
+                        <div key={idx} className="bg-background border border-borderCustom p-2 rounded text-[10px]">
+                          <div className="flex justify-between font-bold text-slate-700 dark:text-slate-350">
+                            <span className="uppercase text-primaryBlue">{log.type} template</span>
+                            <span>{new Date(log.createdAt || log.created_at).toLocaleDateString()}</span>
+                          </div>
+                          <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 line-clamp-1">{log.subject}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+
+            {/* Save operations */}
+            <div className="pt-4 border-t border-borderCustom flex gap-3 mt-4">
+              <button
+                onClick={saveAdminData}
+                className="flex-1 bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2.5 rounded-full shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Persist Decisions
+              </button>
+              <button
+                onClick={() => { setSelectedApp(null); setShowEmailModal(false); }}
+                className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-5 border border-borderCustom rounded-full transition cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+
+          </div>
+
+          {/* Email Template automation popover modal */}
+          {showEmailModal && (
+            <div className="absolute inset-0 bg-cardBg/95 z-30 p-5 flex flex-col justify-between animate-fade-in">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-3 border-b border-borderCustom">
+                  <div>
+                    <h3 className="font-forum font-bold text-primaryBlue text-lg">Send Candidate Outreach</h3>
+                    <p className="text-[10px] text-slate-450 mt-0.5">Dispatches template email communication to {selectedApp.email}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowEmailModal(false)}
+                    className="p-1 rounded-full bg-background hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {emailSuccessMessage && (
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-250 text-emerald-700 text-[10px] font-semibold">
+                    {emailSuccessMessage}
+                  </div>
+                )}
+
+                {emailErrorMessage && (
+                  <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-250 text-rose-700 text-[10px] font-semibold">
+                    {emailErrorMessage}
+                  </div>
+                )}
+
+                <form onSubmit={handleSendEmail} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Select Email Template</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEmailTemplate('interview')}
+                        className={`py-2 px-1 text-center rounded border font-bold ${
+                          emailTemplate === 'interview'
+                            ? 'bg-primaryBlue text-white border-primaryBlue'
+                            : 'bg-background text-foreground border-borderCustom hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        Interview invitation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEmailTemplate('rejection')}
+                        className={`py-2 px-1 text-center rounded border font-bold ${
+                          emailTemplate === 'rejection'
+                            ? 'bg-primaryBlue text-white border-primaryBlue'
+                            : 'bg-background text-foreground border-borderCustom hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        Rejection letter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEmailTemplate('offer')}
+                        className={`py-2 px-1 text-center rounded border font-bold ${
+                          emailTemplate === 'offer'
+                            ? 'bg-primaryBlue text-white border-primaryBlue'
+                            : 'bg-background text-foreground border-borderCustom hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        Offer document
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Subject</label>
+                    <input
+                      type="text"
+                      value={emailSubject}
+                      onChange={(e) => setEmailSubject(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground font-semibold"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">Body Context</label>
+                    <textarea
+                      rows={8}
+                      value={emailBody}
+                      onChange={(e) => setEmailBody(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground font-mono resize-none leading-relaxed"
+                      required
+                    />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={sendingEmail}
+                      className="flex-1 bg-primaryBlue hover:opacity-90 disabled:opacity-50 text-white font-semibold text-xs py-2.5 rounded-full shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Send size={12} />
+                      {sendingEmail ? 'Dispatching...' : 'Dispatch Automated Email'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(false)}
+                      className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-5 border border-borderCustom rounded-full transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+    </div>
+  );
+}

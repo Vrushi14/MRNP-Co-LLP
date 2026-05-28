@@ -1,0 +1,147 @@
+'use client';
+
+import { useState } from 'react';
+import { apiClient } from '@/utils/api';
+import { Eye, EyeOff, ShieldAlert, CheckCircle } from 'lucide-react';
+
+export default function SecuritySettings() {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError('All fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiClient.user.changePassword(currentPassword, newPassword);
+      setSuccess('Your password has been successfully updated.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password. Please check your current password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-cardBg border border-borderCustom rounded-xl p-6 shadow-sm relative overflow-hidden font-instrument">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primaryBlue/5 rounded-full blur-3xl"></div>
+      
+      <h2 className="text-base md:text-lg font-forum font-bold text-primaryBlue mb-1 flex items-center gap-2">
+        Security Credentials
+      </h2>
+      <p className="text-[11px] text-slate-500 mb-6 dark:text-slate-400">
+        Modify your system password. Ensure it has a minimum length of 6 characters.
+      </p>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-955 border border-rose-250 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2 animate-fade-in">
+          <ShieldAlert size={16} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+          <CheckCircle size={16} className="shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+        <div>
+          <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">
+            Current Password
+          </label>
+          <div className="relative">
+            <input
+              type={showCurrent ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground pr-10"
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent(!showCurrent)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-650 cursor-pointer"
+            >
+              {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">
+            New Password
+          </label>
+          <div className="relative">
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground pr-10"
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowNew(!showNew)}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-650 cursor-pointer"
+            >
+              {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">
+            Confirm New Password
+          </label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground"
+            placeholder="••••••••"
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-primaryBlue hover:opacity-90 disabled:opacity-50 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+        >
+          {loading ? 'Updating Credentials...' : 'Change Password'}
+        </button>
+      </form>
+    </div>
+  );
+}

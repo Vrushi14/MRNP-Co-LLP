@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF9F6;
+  --foreground: #191919;
+  --primary-blue: #061143;
+  --border-color: #e5e7eb;
+  --card-bg: #ffffff;
+}
+
+.dark {
+  --background: #0b0f19;
+  --foreground: #f3f4f6;
+  --primary-blue: #60a5fa;
+  --border-color: #1e293b;
+  --card-bg: #111827;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primaryBlue: var(--primary-blue);
+  --color-borderCustom: var(--border-color);
+  --color-cardBg: var(--card-bg);
+
+  --font-forum: var(--font-forum);
+  --font-instrument: var(--font-instrument-sans);
+  --font-inter: var(--font-inter-tight);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-instrument), sans-serif;
+}
+
+p, li {
+  text-align: justify;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+
+/* Container background */
+.globe-container {
+  background-color: #061143;
+  /* deep navy background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  /* full screen */
+}
+
+/* Globe style */
+.globe {
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  /* makes it circular */
+  background: radial-gradient(circle at 30% 30%,
+      rgba(0, 191, 255, 0.9),
+      /* bright cyan highlight */
+      rgba(0, 100, 200, 0.8),
+      /* mid blue */
+      rgba(0, 50, 120, 0.9));
+  /* deep ocean blue */
+  box-shadow: inset -20px -20px 40px rgba(0, 0, 0, 0.4),
+    /* inner shading */
+    0 0 60px rgba(0, 191, 255, 0.6);
+  /* glow effect */
+  position: relative;
+  overflow: hidden;
+
+  /* Rotation animation */
+  animation: spin 20s linear infinite;
+  transition: all 0.5s ease;
+  /* smooth hover transitions */
+}
+
+/* Optional longitude/latitude lines */
+.globe::before,
+.globe::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  /* faint white lines */
+}
+
+.globe::before {
+  width: 100%;
+  height: 100%;
+}
+
+.globe::after {
+  width: 80%;
+  height: 80%;
+  top: 10%;
+  left: 10%;
+}
+
+/* Keyframes for rotation */
+@keyframes spin {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(360deg);
+  }
+}
+
+/* Hover effect */
+.globe:hover {
+  animation-duration: 8s;
+  /* speeds up rotation */
+  box-shadow: inset -20px -20px 40px rgba(0, 0, 0, 0.4),
+    0 0 100px rgba(0, 191, 255, 0.9);
+  /* brighter glow */
+  transform: scale(1.05);
+  /* slight zoom */
+}
+
+
+/* Pause animation on hover */
+.animate-marquee-container:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
+.locations-page {
+  background-color: var(--primary-blue);
+  color: #f5f5f5;
+  font-family: var(--font-instrument), sans-serif;
+  padding: 50px;
+}
+
+.locations-page h2 {
+  color: #00bfff;
+  margin-bottom: 20px;
+}
+
+.locations-list {
+  list-style: none;
+  padding: 0;
+}
+
+.locations-list li {
+  margin: 10px 0;
+  font-size: 1.2em;
+  opacity: 0.9;
+}
+
+.card {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 2rem;
+  border-radius: 0;
+  background-color: transparent;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  border-color: #00bfff;
+}
+
+.card h3 {
+  font-family: var(--font-forum);
+  font-size: 1.5rem !important;
+  line-height: 1.2 !important;
+  margin-bottom: 1rem !important;
+  color: var(--primary-blue) !important;
+}
+
+.card p {
+  font-family: var(--font-instrument);
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+  color: #4b5563 !important;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 1s ease-out forwards;
+}
+
+.animation-delay-150 {
+  animation-delay: 0.15s;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}

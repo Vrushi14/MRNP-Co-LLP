@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "dev:backend": "npm run dev --prefix mrnp-backend",
+    "dev:frontend": "npm run dev --prefix mrnp-frontend"
+  },
+  "dependencies": {
+    "puppeteer": "^24.42.0",
+    "website-scraper": "^6.0.0"
+  }
+}

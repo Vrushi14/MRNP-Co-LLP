@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js and frontend builds
+mrnp-frontend/.next/
+mrnp-frontend/out/
+
+# Backend builds & uploads
+mrnp-backend/uploads/*
+!mrnp-backend/uploads/.gitkeep
+
+# Local user/test data
+mrnp-backend/applications.csv
+
+# OS files
+.DS_Store
+*.pem
+.git-backup
+
+# Env files
+.env*
+.env.local
+.env.production
+.env.development
+
+# Debug and Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vercel configs
+.vercel
+
+# TS build info
+*.tsbuildinfo
