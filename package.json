@@ -1,5 +1,7 @@
 {
   "scripts": {
+    "build": "npm run build --prefix mrnp-frontend",
+    "start": "npm start --prefix mrnp-frontend",
     "dev:backend": "npm run dev --prefix mrnp-backend",
     "dev:frontend": "npm run dev --prefix mrnp-frontend"
   },
