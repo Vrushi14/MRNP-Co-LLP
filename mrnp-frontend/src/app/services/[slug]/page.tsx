@@ -4,6 +4,9 @@ import Navbar from "@/components/Navbar";
 import { Footer, HereToHelp } from "@/components/LazyComponents";
 import { ServiceSidebar, AnimatedSection, AnimatedImage } from "@/components/ServicePageClient";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // ─── Per-service rich content ────────────────────────────────────────────────
 
 type ServiceContent = {
@@ -201,6 +204,15 @@ function getDefaultContent(title: string): ServiceContent {
   };
 }
 
+const getImageUrl = (imagePath?: string | null): string | null => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('/uploads/')) {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  }
+  return imagePath;
+};
+
 // ─── Static params ────────────────────────────────────────────────────────────
 
 export function generateStaticParams() {
@@ -213,10 +225,38 @@ export default async function ServicePage(props: {
   params: Promise<{ slug: string }>;
 }) {
   const params = await props.params;
-  const service = servicesData.find((s) => s.slug === params.slug);
-  if (!service) notFound();
+  const slug = params.slug;
 
-  const content = serviceContent[service.slug] ?? getDefaultContent(service.title);
+  let service = null;
+  let content = null;
+
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const res = await fetch(`${apiUrl}/services/slug/${slug}`, {
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      service = await res.json();
+    }
+  } catch (err) {
+    console.error("Error fetching service from database:", err);
+  }
+
+  // Fallback to static if not in DB or fetch fails
+  if (!service) {
+    service = servicesData.find((s) => s.slug === slug);
+    if (!service) notFound();
+    content = serviceContent[slug] ?? getDefaultContent(service.title);
+  } else {
+    content = {
+      pageTitle: service.pageTitle || service.title,
+      intro: service.intro || '',
+      sections: service.sections || [],
+      whyTitle: service.whyTitle || '',
+      whySubtitle: service.whySubtitle || '',
+      whyCards: service.whyCards || []
+    };
+  }
 
   return (
     <main className="flex flex-col min-h-screen bg-white">
@@ -263,10 +303,12 @@ export default async function ServicePage(props: {
               )}
 
               {/* Banner image */}
-              <AnimatedImage src={service.image} alt={service.title} />
+              {getImageUrl(service.image) ? (
+                <AnimatedImage src={getImageUrl(service.image)!} alt={service.title} />
+              ) : null}
 
               {/* Sections */}
-              {content.sections.map((section, i) => (
+              {content.sections.map((section: any, i: number) => (
                 <AnimatedSection
                   key={i}
                   heading={section.heading}
@@ -295,7 +337,7 @@ export default async function ServicePage(props: {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-[1596px]">
-              {content.whyCards.map((card, i) => (
+              {content.whyCards.map((card: any, i: number) => (
                 <div key={i} className="card text-left">
                   <h3 className="font-forum text-[#1A2B5E] text-2xl md:text-[2.125rem] leading-[1.25] font-normal mb-5">
                     {card.title}

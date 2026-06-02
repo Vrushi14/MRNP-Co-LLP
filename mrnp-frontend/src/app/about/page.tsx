@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import HereToHelp from "@/components/HereToHelp";
@@ -161,8 +161,59 @@ const partners = [
   },
 ];
 
+const getImageUrl = (imagePath?: string | null): string | null => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('/uploads/')) {
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+    return `${baseUrl}${imagePath}`;
+  }
+  return imagePath;
+};
+
 export default function AboutPage() {
-  const [selectedPartner, setSelectedPartner] = useState<(typeof partners)[0] | null>(null);
+  const [heroTitle, setHeroTitle] = useState("Empowering Financial Futures.");
+  const [heroDescription, setHeroDescription] = useState(
+    "We see each client as unique, with their own set of goals and challenges. That's why we don't offer a one-size-fits-all solution. We're dedicated to understanding your specific needs and working tirelessly to deliver the best possible results."
+  );
+  const [commitmentImage, setCommitmentImage] = useState("/images/about-group.png");
+  const [commitmentTitle, setCommitmentTitle] = useState("An everlasting commitment to fiduciary values");
+  const [commitmentParagraphs, setCommitmentParagraphs] = useState<string[]>([
+    "Established in 2011, MRNP & CO LLP is a distinguished Chartered Accountant firm with a robust presence across multiple states including Bengaluru, Ahmedabad, Raipur, Surat, Vadodara, Gandhidham, and Bhuj. Founded by a cadre of young, dynamic professionals with extensive backgrounds in top consulting firms, our firm specializes in delivering customized solutions to meet the diverse needs of our clients.",
+    "At MRNP & CO LLP, we are committed to providing high-quality, timely services tailored to industry-specific requirements. Our team comprises talented professionals who leverage their expertise to deliver technology-enabled solutions that ensure client success. We prioritize a collaborative approach, fostering synergy across our service areas to offer comprehensive solutions even in the most complex scenarios."
+  ]);
+  const [valuesList, setValuesList] = useState<any[]>(values);
+  const [partnersList, setPartnersList] = useState<any[]>(partners);
+  const [selectedPartner, setSelectedPartner] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchAboutData = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiUrl}/about`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            if (data.heroTitle) setHeroTitle(data.heroTitle);
+            if (data.heroDescription) setHeroDescription(data.heroDescription);
+            if (data.commitmentImage) setCommitmentImage(data.commitmentImage);
+            if (data.commitmentTitle) setCommitmentTitle(data.commitmentTitle);
+            if (data.commitmentParagraphs && data.commitmentParagraphs.length > 0) {
+              setCommitmentParagraphs(data.commitmentParagraphs);
+            }
+            if (data.values && data.values.length > 0) {
+              setValuesList(data.values);
+            }
+            if (data.partners && data.partners.length > 0) {
+              setPartnersList(data.partners);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch About Us page content, using static fallback:", err);
+      }
+    };
+    fetchAboutData();
+  }, []);
 
   return (
     <main className="flex flex-col min-h-screen relative">
@@ -178,7 +229,7 @@ export default function AboutPage() {
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="font-forum text-4xl md:text-5xl lg:text-6xl xl:text-[5rem] 2xl:text-[6.5rem] md:leading-tight lg:leading-[5rem] xl:leading-[6.5rem] bg-gradient-to-b from-white via-white to-white/60 bg-clip-text text-transparent pb-2"
             >
-              Empowering Financial Futures.
+              {heroTitle}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 40 }}
@@ -186,10 +237,7 @@ export default function AboutPage() {
               transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
               className="font-instrument text-base md:text-lg lg:text-xl text-white max-w-4xl leading-relaxed"
             >
-              We see each client as unique, with their own set of goals and
-              challenges. That&apos;s why we don&apos;t offer a one-size-fits-all solution.
-              We&apos;re dedicated to understanding your specific needs and working
-              tirelessly to deliver the best possible results.
+              {heroDescription}
             </motion.p>
           </div>
         </div>
@@ -206,14 +254,16 @@ export default function AboutPage() {
             className="relative w-full"
           >
             <div className="relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
-              <Image
-                src="/images/about-group.png"
-                alt="About MRNP Group"
-                width={1920}
-                height={1080}
-                className="w-full h-auto"
-                loading="lazy"
-              />
+              {getImageUrl(commitmentImage) ? (
+                <Image
+                  src={getImageUrl(commitmentImage)!}
+                  alt="About MRNP Group"
+                  width={1920}
+                  height={1080}
+                  className="w-full h-auto"
+                  loading="lazy"
+                />
+              ) : null}
             </div>
           </motion.div>
         </div>
@@ -232,39 +282,21 @@ export default function AboutPage() {
               viewport={{ once: true }}
               className="font-forum text-3xl md:text-4xl lg:text-5xl text-primaryBlue leading-tight"
             >
-              An everlasting commitment to fiduciary values
+              {commitmentTitle}
             </motion.h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-              <motion.p
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="font-instrument text-primaryBlue text-base md:text-xl leading-relaxed"
-              >
-                Established in 2011, MRNP & CO LLP is a distinguished Chartered
-                Accountant firm with a robust presence across multiple states
-                including Bengaluru, Ahmedabad, Raipur, Surat, Vadodara,
-                Gandhidham, and Bhuj. Founded by a cadre of young, dynamic
-                professionals with extensive backgrounds in top consulting
-                firms, our firm specializes in delivering customized solutions
-                to meet the diverse needs of our clients.
-              </motion.p>
-              <motion.p
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="font-instrument text-primaryBlue text-base md:text-xl leading-relaxed"
-              >
-                At MRNP & CO LLP, we are committed to providing high-quality,
-                timely services tailored to industry-specific requirements. Our
-                team comprises talented professionals who leverage their
-                expertise to deliver technology-enabled solutions that ensure
-                client success. We prioritize a collaborative approach,
-                fostering synergy across our service areas to offer
-                comprehensive solutions even in the most complex scenarios.
-              </motion.p>
+              {commitmentParagraphs.map((para, idx) => (
+                <motion.p
+                  key={idx}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1 * (idx + 1) }}
+                  className="font-instrument text-primaryBlue text-base md:text-xl leading-relaxed"
+                >
+                  {para}
+                </motion.p>
+              ))}
             </div>
           </div>
         </motion.div>
@@ -305,7 +337,7 @@ export default function AboutPage() {
             viewport={{ once: true }}
             className="grid grid-cols-1 md:grid-cols-2 border-t border-gray-200 max-w-7xl mx-auto"
           >
-            {values.map((value, index) => (
+            {valuesList.map((value, index) => (
               <motion.div
                 key={index}
                 variants={{
@@ -316,13 +348,15 @@ export default function AboutPage() {
                   }`}
               >
                 <div className="w-12 h-12 md:w-16 md:h-16 mb-4">
-                  <Image
-                    src={value.icon}
-                    alt={value.title}
-                    width={64}
-                    height={64}
-                    className="w-full h-full object-contain"
-                  />
+                  {getImageUrl(value.icon) ? (
+                    <Image
+                      src={getImageUrl(value.icon)!}
+                      alt={value.title}
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : null}
                 </div>
                 <h3 className="font-instrument font-medium text-2xl md:text-3xl text-primaryBlue">
                   {value.title}
@@ -357,7 +391,7 @@ export default function AboutPage() {
             viewport={{ once: true }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
           >
-            {partners.map((person, index) => (
+            {partnersList.map((person, index) => (
               <motion.div
                 key={index}
                 variants={{
@@ -368,15 +402,17 @@ export default function AboutPage() {
                 className="flex flex-col group cursor-pointer text-left"
               >
                 <div className="relative aspect-[5/6] overflow-hidden bg-gray-100 mb-4">
-                  <Image
-                    src={person.image}
-                    alt={person.name}
-                    fill
-                    className="object-contain grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
-                  />
+                  {getImageUrl(person.image) ? (
+                    <Image
+                      src={getImageUrl(person.image)!}
+                      alt={person.name}
+                      fill
+                      className="object-contain grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
+                    />
+                  ) : null}
                 </div>
                 <h3 className="font-forum text-xl md:text-2xl text-primaryBlue mt-2">
-                  {person.role}
+                  {person.role || person.name}
                 </h3>
                 <p className="font-instrument text-sm text-gray-500">
                   {person.degree}
@@ -408,7 +444,7 @@ export default function AboutPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-full md:w-[800px] lg:w-[900px] bg-white z-[9999] shadow-xl overflow-y-auto overscroll-contain"
+              className="fixed top-0 right-0 h-full w-full md:w-[600px] bg-white z-[9999] shadow-xl overflow-y-auto overscroll-contain"
             >
               <div className="p-2 relative text-black">
                 {/* Close Button Wrapper */}
@@ -437,19 +473,21 @@ export default function AboutPage() {
                 {/* Content Wrapper */}
                 <div className="px-1 sm:px-3 md:px-6 mt-1 space-y-4 md:space-y-8 pb-8">
                   {/* Image Container */}
-                  <div className="lg:w-[65%] aspect-[3/4] relative shadow-lg">
-                    <Image
-                      src={selectedPartner.image}
-                      alt={selectedPartner.name}
-                      fill
-                      className="object-cover"
-                    />
+                  <div className="relative w-full max-w-[280px] aspect-[5/6] overflow-hidden bg-gray-100 shadow-lg">
+                    {getImageUrl(selectedPartner.image) ? (
+                      <Image
+                        src={getImageUrl(selectedPartner.image)!}
+                        alt={selectedPartner.name}
+                        fill
+                        className="object-contain"
+                      />
+                    ) : null}
                   </div>
 
                   {/* Name and Degree Section */}
                   <div>
                     <p className="font-forum text-primaryBlue text-[2rem] md:text-[2.25rem] lg:text-[2.625rem] md:leading-[3.125rem] 2xl:text-[2.625rem] 2xl:leading-tight leading-tight mb-2">
-                      {selectedPartner.role}
+                      {selectedPartner.role || selectedPartner.name}
                     </p>
                     <p className="font-instrument text-[#191919] text-[0.875rem] md:text-[1rem] md:leading-[1.25rem] xl:text-[1.125rem] 2xl:!leading-[1.5rem]">
                       {selectedPartner.degree}

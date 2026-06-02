@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, Menu, X } from "lucide-react";
@@ -11,6 +11,25 @@ export default function Navbar() {
   const [isServicesOpen, setIsServicesOpen] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobileServicesOpen, setIsMobileServicesOpen] = useState(false);
+  const [services, setServices] = useState<any[]>(servicesData);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiUrl}/services`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.services && data.services.length > 0) {
+            setServices(data.services);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch services in Navbar:", err);
+      }
+    };
+    fetchServices();
+  }, []);
 
   return (
     <div className="flex justify-center items-center bg-transparent z-50 absolute top-2 left-0 right-0">
@@ -110,7 +129,7 @@ export default function Navbar() {
                       </h2>
                     </div>
                     <div className="md:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-                      {servicesData.map((service) => (
+                      {services.map((service) => (
                         <Link
                           key={service.slug}
                           href={`/services/${service.slug}`}
@@ -206,7 +225,7 @@ export default function Navbar() {
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden bg-gray-50"
                       >
-                        {servicesData.map((service) => (
+                        {services.map((service) => (
                           <Link
                             key={service.slug}
                             href={`/services/${service.slug}`}

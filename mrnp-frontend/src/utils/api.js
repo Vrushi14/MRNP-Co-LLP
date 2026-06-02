@@ -128,6 +128,45 @@ export const apiClient = {
       apiClient.request(`/interviews/${id}`, { method: 'DELETE' }),
   },
 
+  services: {
+    getAll: () =>
+      apiClient.request('/services', { method: 'GET' }),
+    getBySlug: (slug) =>
+      apiClient.request(`/services/slug/${slug}`, { method: 'GET' }),
+    create: (formData) =>
+      apiClient.request('/services', {
+        method: 'POST',
+        body: formData,
+      }),
+    update: (id, formData) =>
+      apiClient.request(`/services/${id}`, {
+        method: 'PUT',
+        body: formData,
+      }),
+    delete: (id) =>
+      apiClient.request(`/services/${id}`, { method: 'DELETE' }),
+    uploadImage: (formData) =>
+      apiClient.request('/services/upload', {
+        method: 'POST',
+        body: formData,
+      }),
+  },
+
+  about: {
+    get: () =>
+      apiClient.request('/about', { method: 'GET' }),
+    update: (aboutData) =>
+      apiClient.request('/about', {
+        method: 'PUT',
+        body: aboutData,
+      }),
+    uploadImage: (formData) =>
+      apiClient.request('/about/upload', {
+        method: 'POST',
+        body: formData,
+      }),
+  },
+
 };
 
 export const authService = {

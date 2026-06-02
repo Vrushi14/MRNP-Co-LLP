@@ -28,7 +28,8 @@ import {
   UserCheck,
   Plus,
   Bell,
-  Calendar
+  Calendar,
+  LayoutGrid
 } from 'lucide-react';
 
 import SecuritySettings from '@/components/dashboard/SecuritySettings';
@@ -40,8 +41,48 @@ import DashboardWidgets from '@/components/dashboard/DashboardWidgets';
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'applications' | 'jobs' | 'analytics' | 'profile' | 'interviews' | 'notifications'>('analytics');
+  const [activeTab, setActiveTab] = useState<'applications' | 'jobs' | 'analytics' | 'profile' | 'interviews' | 'notifications' | 'services' | 'about'>('analytics');
   const router = useRouter();
+
+  // Services states
+  const [servicesList, setServicesList] = useState<any[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState('');
+  const [isServiceEditing, setIsServiceEditing] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [serviceSaveError, setServiceSaveError] = useState('');
+  const [serviceSaveSuccess, setServiceSaveSuccess] = useState('');
+
+  // Service Form State
+  const [serviceTitle, setServiceTitle] = useState('');
+  const [serviceSlug, setServiceSlug] = useState('');
+  const [serviceDescription, setServiceDescription] = useState('');
+  const [serviceImage, setServiceImage] = useState('');
+  const [servicePageTitle, setServicePageTitle] = useState('');
+  const [serviceIntro, setServiceIntro] = useState('');
+  const [serviceWhyTitle, setServiceWhyTitle] = useState('');
+  const [serviceWhySubtitle, setServiceWhySubtitle] = useState('');
+  const [serviceSections, setServiceSections] = useState<any[]>([]);
+  const [serviceWhyCards, setServiceWhyCards] = useState<any[]>([]);
+  const [serviceStatus, setServiceStatus] = useState<'published' | 'draft'>('published');
+
+  // About Page states
+  const [aboutLoading, setAboutLoading] = useState(false);
+  const [aboutError, setAboutError] = useState('');
+  const [aboutSaveSuccess, setAboutSaveSuccess] = useState('');
+  const [aboutSaveError, setAboutSaveError] = useState('');
+  const [isUploadingAboutImage, setIsUploadingAboutImage] = useState(false);
+
+  // About Page Form State
+  const [aboutHeroTitle, setAboutHeroTitle] = useState('');
+  const [aboutHeroDescription, setAboutHeroDescription] = useState('');
+  const [aboutCommitmentImage, setAboutCommitmentImage] = useState('');
+  const [aboutCommitmentTitle, setAboutCommitmentTitle] = useState('');
+  const [aboutCommitmentParagraphs, setAboutCommitmentParagraphs] = useState<string[]>([]);
+  const [aboutValues, setAboutValues] = useState<any[]>([]);
+  const [aboutPartners, setAboutPartners] = useState<any[]>([]);
+
 
   // Theme support
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -177,6 +218,9 @@ export default function DashboardPage() {
 
         // Fetch interviews
         await loadInterviews();
+
+        // Fetch services
+        await loadServices();
       } catch (err: any) {
         setProfileError(err.message || 'Failed to load profile details.');
       } finally {
@@ -230,6 +274,218 @@ export default function DashboardPage() {
       setInterviews(res.interviews || []);
     } catch (err) {
       console.error('Failed to load interviews', err);
+    }
+  };
+
+  const getImageUrl = (imagePath?: string | null): string | undefined => {
+    if (!imagePath) return undefined;
+    if (imagePath.startsWith('/uploads/')) {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+      return `${baseUrl}${imagePath}`;
+    }
+    return imagePath;
+  };
+
+  const loadServices = async () => {
+    try {
+      setServicesLoading(true);
+      setServicesError('');
+      const res = await apiClient.services.getAll();
+      setServicesList(res.services || []);
+    } catch (err: any) {
+      setServicesError(err.message || 'Failed to load services.');
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  const loadAbout = async () => {
+    try {
+      setAboutLoading(true);
+      setAboutError('');
+      const res = await apiClient.about.get();
+      setAboutHeroTitle(res.heroTitle || '');
+      setAboutHeroDescription(res.heroDescription || '');
+      setAboutCommitmentImage(res.commitmentImage || '');
+      setAboutCommitmentTitle(res.commitmentTitle || '');
+      setAboutCommitmentParagraphs(res.commitmentParagraphs || []);
+      setAboutValues(res.values || []);
+      setAboutPartners(res.partners || []);
+    } catch (err: any) {
+      setAboutError(err.message || 'Failed to load About Us content.');
+    } finally {
+      setAboutLoading(false);
+    }
+  };
+
+  const handleSaveAbout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setAboutSaveError('');
+      setAboutSaveSuccess('');
+      const aboutData = {
+        heroTitle: aboutHeroTitle.trim(),
+        heroDescription: aboutHeroDescription.trim(),
+        commitmentImage: aboutCommitmentImage,
+        commitmentTitle: aboutCommitmentTitle.trim(),
+        commitmentParagraphs: JSON.stringify(aboutCommitmentParagraphs),
+        values: JSON.stringify(aboutValues),
+        partners: JSON.stringify(aboutPartners)
+      };
+
+      await apiClient.about.update(JSON.stringify(aboutData));
+      setAboutSaveSuccess('About Us page content updated successfully!');
+    } catch (err: any) {
+      setAboutSaveError(err.message || 'Failed to update About Us content.');
+    }
+  };
+
+  const handleAboutImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: 'commitment' | 'value' | 'partner', index?: number) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      setIsUploadingAboutImage(true);
+      setAboutSaveError('');
+      const res = await apiClient.about.uploadImage(formData);
+      
+      if (targetType === 'commitment') {
+        setAboutCommitmentImage(res.imageUrl);
+      } else if (targetType === 'value' && index !== undefined) {
+        const updated = [...aboutValues];
+        updated[index].icon = res.imageUrl;
+        setAboutValues(updated);
+      } else if (targetType === 'partner' && index !== undefined) {
+        const updated = [...aboutPartners];
+        updated[index].image = res.imageUrl;
+        setAboutPartners(updated);
+      }
+    } catch (err: any) {
+      setAboutSaveError(err.message || 'Failed to upload image.');
+    } finally {
+      setIsUploadingAboutImage(false);
+    }
+  };
+
+  const handleServiceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      setIsUploadingImage(true);
+      setServiceSaveError('');
+      const res = await apiClient.services.uploadImage(formData);
+      setServiceImage(res.imageUrl);
+    } catch (err: any) {
+      setServiceSaveError(err.message || 'Failed to upload banner image.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const startNewService = () => {
+    setEditingServiceId(null);
+    setServiceTitle('');
+    setServiceSlug('');
+    setServiceDescription('');
+    setServiceImage('');
+    setServicePageTitle('');
+    setServiceIntro('');
+    setServiceWhyTitle('');
+    setServiceWhySubtitle('');
+    setServiceSections([]);
+    setServiceWhyCards([]);
+    setServiceSaveError('');
+    setServiceSaveSuccess('');
+    setServiceStatus('published');
+    setIsServiceEditing(true);
+  };
+
+  const editService = (service: any) => {
+    setEditingServiceId(service._id || service.id);
+    setServiceTitle(service.title || '');
+    setServiceSlug(service.slug || '');
+    setServiceDescription(service.description || '');
+    setServiceImage(service.image || '');
+    setServicePageTitle(service.pageTitle || '');
+    setServiceIntro(service.intro || '');
+    setServiceWhyTitle(service.whyTitle || '');
+    setServiceWhySubtitle(service.whySubtitle || '');
+    setServiceStatus(service.status || 'published');
+    
+    const processedSections = (service.sections || []).map((sec: any) => ({
+      heading: sec.heading || '',
+      description: sec.description || '',
+      body: Array.isArray(sec.body) ? sec.body.join('\n') : sec.body || ''
+    }));
+    setServiceSections(processedSections);
+    
+    setServiceWhyCards(service.whyCards || []);
+    setServiceSaveError('');
+    setServiceSaveSuccess('');
+    setIsServiceEditing(true);
+  };
+
+  const handleSaveService = async (e?: React.FormEvent, statusOverride?: 'published' | 'draft') => {
+    if (e && e.preventDefault) e.preventDefault();
+    
+    const finalStatus = statusOverride || serviceStatus;
+
+    if (!serviceTitle.trim() || !serviceSlug.trim()) {
+      setServiceSaveError('Title and Slug are required.');
+      return;
+    }
+
+    try {
+      setServiceSaveError('');
+      setServiceSaveSuccess('');
+      
+      const processedSections = serviceSections.map(sec => ({
+        heading: sec.heading.trim(),
+        description: sec.description.trim(),
+        body: sec.body.includes('\n') ? sec.body.split('\n').map((b: string) => b.trim()).filter(Boolean) : sec.body.trim()
+      }));
+
+      const serviceData = {
+        title: serviceTitle.trim(),
+        slug: serviceSlug.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-'),
+        description: serviceDescription.trim(),
+        image: serviceImage,
+        pageTitle: servicePageTitle.trim(),
+        intro: serviceIntro.trim(),
+        whyTitle: serviceWhyTitle.trim(),
+        whySubtitle: serviceWhySubtitle.trim(),
+        sections: JSON.stringify(processedSections),
+        whyCards: JSON.stringify(serviceWhyCards),
+        status: finalStatus
+      };
+
+      if (editingServiceId) {
+        await apiClient.services.update(editingServiceId, JSON.stringify(serviceData));
+        setServiceSaveSuccess(finalStatus === 'draft' ? 'Service saved as draft successfully!' : 'Service updated and published successfully!');
+      } else {
+        await apiClient.services.create(JSON.stringify(serviceData));
+        setServiceSaveSuccess(finalStatus === 'draft' ? 'Service created as draft successfully!' : 'Service created and published successfully!');
+      }
+
+      setIsServiceEditing(false);
+      await loadServices();
+    } catch (err: any) {
+      setServiceSaveError(err.message || 'Failed to save service.');
+    }
+  };
+
+  const handleDeleteService = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this service? This will delete the service and its associated image permanently.')) return;
+    try {
+      await apiClient.services.delete(id);
+      await loadServices();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete service.');
     }
   };
 
@@ -878,6 +1134,35 @@ MRNP Managing Partners`);
             </button>
 
             <button
+              onClick={() => { setActiveTab('services'); loadServices(); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'services'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <LayoutGrid size={18} />
+              Manage Services
+              {servicesList.length > 0 && (
+                <span className="ml-auto bg-primaryBlue/10 dark:bg-slate-800 text-primaryBlue text-[10px] font-bold px-2 py-0.5 rounded-full border border-primaryBlue/20">
+                  {servicesList.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('about'); loadAbout(); setIsMobileOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                activeTab === 'about'
+                  ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
+              }`}
+            >
+              <Users size={18} />
+              Manage About Us
+            </button>
+
+            <button
               onClick={() => { setActiveTab('applications'); setIsMobileOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'applications'
@@ -954,7 +1239,826 @@ MRNP Managing Partners`);
       {/* Main Workspace Frame container */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full transition-all duration-300">
         
-        {activeTab === 'jobs' ? (
+        {activeTab === 'about' ? (
+          /* ========== ABOUT US MANAGEMENT TAB ========== */
+          <div>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue dark:text-white">Manage About Us</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Directly manage, edit text content, core values, and team members for the About Us page.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadAbout}
+                className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom shadow-sm flex items-center gap-2 self-start cursor-pointer hover:border-primaryBlue/30 transition"
+              >
+                <Plus size={14} />
+                Refresh Content
+              </button>
+            </div>
+
+            {aboutLoading ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue mx-auto mb-3"></div>
+                <p className="text-slate-400 text-xs">Querying database About Us content...</p>
+              </div>
+            ) : aboutError ? (
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{aboutError}</div>
+            ) : (
+              <form onSubmit={handleSaveAbout} className="bg-cardBg border border-borderCustom rounded-xl p-6 shadow-sm space-y-6">
+                <div className="flex justify-between items-center border-b border-borderCustom pb-4">
+                  <h2 className="text-lg font-forum font-bold text-primaryBlue dark:text-white flex items-center gap-2">
+                    <Plus size={18} />
+                    Edit About Us Page Content
+                  </h2>
+                </div>
+
+                {aboutSaveError && (
+                  <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{aboutSaveError}</div>
+                )}
+
+                {aboutSaveSuccess && (
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-emerald-700 text-xs rounded-lg">{aboutSaveSuccess}</div>
+                )}
+
+                {/* Section 1: Hero Section */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4">
+                  <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">1. Hero Header Section</h3>
+                  <div className="grid grid-cols-1 gap-4 font-instrument">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Hero Title *</label>
+                      <input
+                        type="text"
+                        value={aboutHeroTitle}
+                        onChange={e => setAboutHeroTitle(e.target.value)}
+                        placeholder="e.g. Empowering Financial Futures."
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Hero Subtitle / Description *</label>
+                      <textarea
+                        rows={3}
+                        value={aboutHeroDescription}
+                        onChange={e => setAboutHeroDescription(e.target.value)}
+                        placeholder="We see each client as unique..."
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Commitment Section */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4">
+                  <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">2. Fiduciary Commitment Section</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-instrument">
+                    {/* Image Upload */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Group Overlay Image</label>
+                      <div className="border border-dashed border-borderCustom rounded-xl p-4 bg-background/40 flex flex-col items-center justify-center text-center relative overflow-hidden h-[180px] group">
+                        {isUploadingAboutImage ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue"></div>
+                            <p className="text-[10px] text-slate-400">Uploading...</p>
+                          </div>
+                        ) : aboutCommitmentImage ? (
+                          <>
+                            <img src={getImageUrl(aboutCommitmentImage)} alt="Commitment Banner" className="object-cover w-full h-full absolute inset-0" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <label className="bg-white/95 text-primaryBlue px-3 py-1.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition shadow">
+                                Change Image
+                                <input type="file" onChange={e => handleAboutImageUpload(e, 'commitment')} className="hidden" accept="image/*" />
+                              </label>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2.5">
+                            <LayoutGrid size={32} className="text-slate-400 stroke-[1.25]" />
+                            <div>
+                              <label className="text-primaryBlue hover:underline text-xs font-bold cursor-pointer">
+                                Upload image
+                                <input type="file" onChange={e => handleAboutImageUpload(e, 'commitment')} className="hidden" accept="image/*" />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Text Fields */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Commitment Section Title *</label>
+                        <input
+                          type="text"
+                          value={aboutCommitmentTitle}
+                          onChange={e => setAboutCommitmentTitle(e.target.value)}
+                          placeholder="e.g. An everlasting commitment to fiduciary values"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Commitment Body Paragraphs (One paragraph per line)</label>
+                        <textarea
+                          rows={4}
+                          value={aboutCommitmentParagraphs.join('\n')}
+                          onChange={e => setAboutCommitmentParagraphs(e.target.value.split('\n'))}
+                          placeholder={`Established in 2011...\nAt MRNP & CO LLP...`}
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed font-sans"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Core Values List */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4 font-instrument">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">3. Company Core Values</h3>
+                    <button
+                      type="button"
+                      onClick={() => setAboutValues([...aboutValues, { title: '', description: '', icon: '' }])}
+                      className="px-3 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Add Core Value
+                    </button>
+                  </div>
+
+                  {aboutValues.length === 0 ? (
+                    <div className="p-8 text-center border border-borderCustom border-dashed rounded-xl text-slate-400 text-xs">
+                      No core values defined. Click "Add Core Value" to build them.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {aboutValues.map((val, idx) => (
+                        <div key={idx} className="bg-background/30 border border-borderCustom p-4 rounded-xl relative space-y-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...aboutValues];
+                              updated.splice(idx, 1);
+                              setAboutValues(updated);
+                            }}
+                            className="absolute top-4 right-4 text-xs text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+
+                          <div className="flex gap-4">
+                            {/* Icon Uploader */}
+                            <div className="flex flex-col items-center">
+                              <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Icon</label>
+                              <div className="w-12 h-12 border border-borderCustom rounded-lg relative overflow-hidden bg-background/50 flex items-center justify-center group">
+                                {val.icon ? (
+                                  <>
+                                    <img src={getImageUrl(val.icon)} alt="Value Icon" className="w-full h-full object-contain" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <label className="cursor-pointer text-[8px] text-white font-bold p-0.5 bg-black/50 rounded">
+                                        Edit
+                                        <input type="file" onChange={e => handleAboutImageUpload(e, 'value', idx)} className="hidden" accept="image/*" />
+                                      </label>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <label className="cursor-pointer text-[9px] text-primaryBlue font-bold text-center leading-none">
+                                    Upload
+                                    <input type="file" onChange={e => handleAboutImageUpload(e, 'value', idx)} className="hidden" accept="image/*" />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Details fields */}
+                            <div className="flex-1 space-y-2">
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Value Title *</label>
+                                <input
+                                  type="text"
+                                  value={val.title}
+                                  onChange={e => {
+                                    const updated = [...aboutValues];
+                                    updated[idx].title = e.target.value;
+                                    setAboutValues(updated);
+                                  }}
+                                  placeholder="e.g. Putting Clients First:"
+                                  className="w-full px-2 py-1 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground font-semibold placeholder:text-slate-400"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Description *</label>
+                                <textarea
+                                  rows={2}
+                                  value={val.description}
+                                  onChange={e => {
+                                    const updated = [...aboutValues];
+                                    updated[idx].description = e.target.value;
+                                    setAboutValues(updated);
+                                  }}
+                                  placeholder="Provide the value explanation..."
+                                  className="w-full px-2 py-1 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-normal"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 4: Partners / Team members list */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4 font-instrument">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">4. Partners & Team Members</h3>
+                    <button
+                      type="button"
+                      onClick={() => setAboutPartners([...aboutPartners, { name: '', role: '', degree: '', image: '', email: '', bio: '' }])}
+                      className="px-3 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Add Team Member
+                    </button>
+                  </div>
+
+                  {aboutPartners.length === 0 ? (
+                    <div className="p-8 text-center border border-borderCustom border-dashed rounded-xl text-slate-400 text-xs">
+                      No team members defined. Click "Add Team Member" to build your team.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {aboutPartners.map((pt, idx) => (
+                        <div key={idx} className="bg-background/30 border border-borderCustom p-4 rounded-xl relative space-y-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...aboutPartners];
+                              updated.splice(idx, 1);
+                              setAboutPartners(updated);
+                            }}
+                            className="absolute top-4 right-4 text-xs text-rose-500 hover:text-rose-600 font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Trash2 size={12} />
+                            Remove
+                          </button>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                            {/* Profile Image Column */}
+                            <div className="flex flex-col items-center justify-center">
+                              <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Profile Photo</label>
+                              <div className="w-24 h-28 border border-borderCustom rounded-lg relative overflow-hidden bg-background/50 flex items-center justify-center group shadow-inner">
+                                {pt.image ? (
+                                  <>
+                                    <img src={getImageUrl(pt.image)} alt="Profile" className="w-full h-full object-contain" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <label className="cursor-pointer text-[9px] text-white font-bold p-1 bg-black/50 rounded">
+                                        Change
+                                        <input type="file" onChange={e => handleAboutImageUpload(e, 'partner', idx)} className="hidden" accept="image/*" />
+                                      </label>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <label className="cursor-pointer text-[10px] text-primaryBlue font-bold text-center leading-none">
+                                    Click to Upload
+                                    <input type="file" onChange={e => handleAboutImageUpload(e, 'partner', idx)} className="hidden" accept="image/*" />
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Details fields Column */}
+                            <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3 pr-20">
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Full Name *</label>
+                                <input
+                                  type="text"
+                                  value={pt.name}
+                                  onChange={e => {
+                                    const updated = [...aboutPartners];
+                                    updated[idx].name = e.target.value;
+                                    setAboutPartners(updated);
+                                  }}
+                                  placeholder="e.g. Nemish Patel"
+                                  className="w-full px-3 py-1.5 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground font-semibold placeholder:text-slate-400"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Display Role/Title</label>
+                                <input
+                                  type="text"
+                                  value={pt.role}
+                                  onChange={e => {
+                                    const updated = [...aboutPartners];
+                                    updated[idx].role = e.target.value;
+                                    setAboutPartners(updated);
+                                  }}
+                                  placeholder="e.g. CA. Nemish Patel"
+                                  className="w-full px-3 py-1.5 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Degree & Location</label>
+                                <input
+                                  type="text"
+                                  value={pt.degree}
+                                  onChange={e => {
+                                    const updated = [...aboutPartners];
+                                    updated[idx].degree = e.target.value;
+                                    setAboutPartners(updated);
+                                  }}
+                                  placeholder="e.g. (FCA, LLB, B.Com) : Vadodara"
+                                  className="w-full px-3 py-1.5 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Email Address</label>
+                                <input
+                                  type="email"
+                                  value={pt.email}
+                                  onChange={e => {
+                                    const updated = [...aboutPartners];
+                                    updated[idx].email = e.target.value;
+                                    setAboutPartners(updated);
+                                  }}
+                                  placeholder="e.g. nemish@mrnp.in"
+                                  className="w-full px-3 py-1.5 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Bio details spanning full bottom */}
+                            <div className="lg:col-span-4 mt-2">
+                              <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Detailed Partner Bio *</label>
+                              <textarea
+                                rows={4}
+                                value={pt.bio}
+                                onChange={e => {
+                                  const updated = [...aboutPartners];
+                                  updated[idx].bio = e.target.value;
+                                  setAboutPartners(updated);
+                                }}
+                                placeholder="Write a detailed professional biography here..."
+                                className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                                required
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Save changes bottom row */}
+                <div className="border-t border-borderCustom/60 pt-5 flex justify-end gap-3 font-instrument">
+                  <button
+                    type="submit"
+                    className="px-8 py-2.5 bg-primaryBlue hover:bg-primaryBlue/90 text-white text-xs font-bold rounded-full shadow-md shadow-[#061143]/15 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Save About Us Changes
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        ) : activeTab === 'services' ? (
+          /* ========== SERVICES MANAGEMENT TAB ========== */
+          <div>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue dark:text-white">Manage Services</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Add new services, upload banners, and edit detailed layout content.</p>
+              </div>
+              {!isServiceEditing && (
+                <button
+                  onClick={startNewService}
+                  className="bg-primaryBlue hover:bg-primaryBlue/90 text-white font-semibold text-xs py-2.5 px-5 rounded-lg flex items-center gap-2 cursor-pointer transition shadow-md shadow-[#061143]/20"
+                >
+                  <Plus size={14} />
+                  Add New Service
+                </button>
+              )}
+            </div>
+
+            {isServiceEditing ? (
+              /* ========== SERVICES EDITOR FORM ========== */
+              <form onSubmit={(e) => handleSaveService(e)} className="bg-cardBg border border-borderCustom rounded-xl p-6 shadow-sm space-y-6">
+                <div className="flex justify-between items-center border-b border-borderCustom pb-4">
+                  <h2 className="text-lg font-forum font-bold text-primaryBlue dark:text-white flex items-center gap-2">
+                    <Plus size={18} />
+                    {editingServiceId ? 'Edit Service Page' : 'Create Service Page'}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsServiceEditing(false)}
+                    className="text-xs text-slate-400 hover:text-foreground font-semibold cursor-pointer"
+                  >
+                    Cancel and Return
+                  </button>
+                </div>
+
+                {serviceSaveError && (
+                  <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{serviceSaveError}</div>
+                )}
+
+                {serviceSaveSuccess && (
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-emerald-700 text-xs rounded-lg">{serviceSaveSuccess}</div>
+                )}
+
+                {/* Grid for main properties */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Column 1 & 2: Form fields */}
+                  <div className="lg:col-span-2 space-y-4 font-instrument">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Service Title *</label>
+                        <input
+                          type="text"
+                          value={serviceTitle}
+                          onChange={e => {
+                            setServiceTitle(e.target.value);
+                            if (!editingServiceId) {
+                              setServiceSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                            }
+                          }}
+                          placeholder="e.g. Audit & Assurance Services"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">URL Slug *</label>
+                        <input
+                          type="text"
+                          value={serviceSlug}
+                          onChange={e => setServiceSlug(e.target.value)}
+                          placeholder="e.g. audit-and-assurance"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-mono"
+                          required
+                        />
+                        <p className="text-[9px] text-slate-400 mt-1">Unique URL path segment: /services/{"{slug}"}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Listing Card Description</label>
+                      <textarea
+                        rows={3}
+                        value={serviceDescription}
+                        onChange={e => setServiceDescription(e.target.value)}
+                        placeholder="Provide a short summary displayed on listing cards and dropdown menu..."
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Page Hero Title</label>
+                        <input
+                          type="text"
+                          value={servicePageTitle}
+                          onChange={e => setServicePageTitle(e.target.value)}
+                          placeholder="e.g. What is an Audit & Assurance Service?"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Page Intro Paragraph</label>
+                        <input
+                          type="text"
+                          value={serviceIntro}
+                          onChange={e => setServiceIntro(e.target.value)}
+                          placeholder="e.g. An independent verification builds trust with stakeholders..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column 3: Banner Image Upload */}
+                  <div className="space-y-4 font-instrument">
+                    <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Banner Image</label>
+                    <div className="border border-dashed border-borderCustom rounded-xl p-4 bg-background/40 flex flex-col items-center justify-center text-center relative overflow-hidden h-[180px] group">
+                      {isUploadingImage ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue"></div>
+                          <p className="text-[10px] text-slate-400">Uploading banner...</p>
+                        </div>
+                      ) : serviceImage ? (
+                        <>
+                          <img src={getImageUrl(serviceImage)} alt="Banner Preview" className="object-cover w-full h-full absolute inset-0" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <label className="bg-white/95 text-primaryBlue px-3 py-1.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition shadow">
+                              Change Image
+                              <input type="file" onChange={handleServiceImageUpload} className="hidden" accept="image/*" />
+                            </label>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2.5">
+                          <LayoutGrid size={32} className="text-slate-400 stroke-[1.25]" />
+                          <div>
+                            <label className="text-primaryBlue hover:underline text-xs font-bold cursor-pointer">
+                              Click to upload image
+                              <input type="file" onChange={handleServiceImageUpload} className="hidden" accept="image/*" />
+                            </label>
+                            <p className="text-[9px] text-slate-400 mt-1">PNG, JPG, WEBP, or SVG (Max 5MB)</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive Sections Editor */}
+                <div className="border-t border-borderCustom/60 pt-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white flex items-center gap-1.5">
+                      Detailed Sections Content
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setServiceSections([...serviceSections, { heading: '', description: '', body: '' }])}
+                      className="px-3 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Add Dynamic Section
+                    </button>
+                  </div>
+
+                  {serviceSections.length === 0 ? (
+                    <div className="p-8 text-center border border-borderCustom border-dashed rounded-xl text-slate-400 text-xs font-instrument">
+                      No sections defined. Click "Add Dynamic Section" to write sub-headings, explanations, or lists.
+                    </div>
+                  ) : (
+                    <div className="space-y-4 font-instrument">
+                      {serviceSections.map((sec, idx) => (
+                        <div key={idx} className="bg-background/30 border border-borderCustom p-4 rounded-xl relative space-y-3.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...serviceSections];
+                              updated.splice(idx, 1);
+                              setServiceSections(updated);
+                            }}
+                            className="absolute top-4 right-4 text-xs text-rose-500 hover:text-rose-650 font-bold transition flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Trash2 size={12} />
+                            Remove
+                          </button>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pr-20">
+                            <div>
+                              <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Section Title</label>
+                              <input
+                                type="text"
+                                value={sec.heading}
+                                onChange={e => {
+                                  const updated = [...serviceSections];
+                                  updated[idx].heading = e.target.value;
+                                  setServiceSections(updated);
+                                }}
+                                placeholder="e.g. Benefits of Audit"
+                                className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Section Description (Optional)</label>
+                              <input
+                                type="text"
+                                value={sec.description}
+                                onChange={e => {
+                                  const updated = [...serviceSections];
+                                  updated[idx].description = e.target.value;
+                                  setServiceSections(updated);
+                                }}
+                                placeholder="e.g. A personalized strategic roadmap..."
+                                className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Body Text / Bullet points (one per line)</label>
+                            <textarea
+                              rows={3}
+                              value={sec.body}
+                              onChange={e => {
+                                const updated = [...serviceSections];
+                                updated[idx].body = e.target.value;
+                                setServiceSections(updated);
+                              }}
+                              placeholder={`Write point one here...\nWrite point two here...\nWrite point three here...`}
+                              className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                            />
+                            <p className="text-[9px] text-slate-400 mt-1 font-sans">If you write multiple lines, they will be formatted automatically as a beautiful bullet list!</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Why choose us Block */}
+                <div className="border-t border-borderCustom/60 pt-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-instrument">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">"Why Choose Us" Section Title</label>
+                      <input
+                        type="text"
+                        value={serviceWhyTitle}
+                        onChange={e => setServiceWhyTitle(e.target.value)}
+                        placeholder="e.g. Why Choose MRNP & CO LLP?"
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">"Why Choose Us" Subtitle</label>
+                      <input
+                        type="text"
+                        value={serviceWhySubtitle}
+                        onChange={e => setServiceWhySubtitle(e.target.value)}
+                        placeholder="e.g. We possess in-depth customized strategies..."
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center font-instrument">
+                    <h4 className="text-xs font-bold text-slate-600 dark:text-slate-350">Why Choose Us Highlight Cards</h4>
+                    <button
+                      type="button"
+                      onClick={() => setServiceWhyCards([...serviceWhyCards, { title: '', body: '' }])}
+                      className="px-3 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      Add Highlight Card
+                    </button>
+                  </div>
+
+                  {serviceWhyCards.length === 0 ? (
+                    <div className="p-8 text-center border border-borderCustom border-dashed rounded-xl text-slate-400 text-xs font-instrument">
+                      No highlight cards defined. Click "Add Highlight Card" to describe your unique competitive advantages.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-instrument">
+                      {serviceWhyCards.map((card, idx) => (
+                        <div key={idx} className="bg-background/30 border border-borderCustom p-4 rounded-xl relative space-y-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...serviceWhyCards];
+                              updated.splice(idx, 1);
+                              setServiceWhyCards(updated);
+                            }}
+                            className="absolute top-4 right-4 text-xs text-rose-500 hover:text-rose-600 font-bold cursor-pointer"
+                            title="Remove card"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+
+                          <div className="pr-6">
+                            <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Card Header Title</label>
+                            <input
+                              type="text"
+                              value={card.title}
+                              onChange={e => {
+                                const updated = [...serviceWhyCards];
+                                updated[idx].title = e.target.value;
+                                setServiceWhyCards(updated);
+                              }}
+                              placeholder="e.g. Industry Expertise"
+                              className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold mb-1">Card Explanation Body</label>
+                            <textarea
+                              rows={3}
+                              value={card.body}
+                              onChange={e => {
+                                const updated = [...serviceWhyCards];
+                                updated[idx].body = e.target.value;
+                                setServiceWhyCards(updated);
+                              }}
+                              placeholder="Describe this strength in 1-2 brief sentences..."
+                              className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                              required
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Save and cancel bottom row */}
+                <div className="border-t border-borderCustom/60 pt-5 flex justify-end gap-3 font-instrument">
+                  <button
+                    type="button"
+                    onClick={() => setIsServiceEditing(false)}
+                    className="px-6 py-2.5 border border-borderCustom bg-cardBg hover:bg-background text-foreground text-xs font-semibold rounded-full transition cursor-pointer"
+                  >
+                    Cancel changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveService(undefined, 'draft')}
+                    className="px-6 py-2.5 border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold rounded-full transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Save as Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveService(undefined, 'published')}
+                    className="px-8 py-2.5 bg-primaryBlue hover:bg-primaryBlue/90 text-white text-xs font-bold rounded-full shadow-md shadow-[#061143]/15 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Publish
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* ========== SERVICES LIST VIEW ========== */
+              <>
+                {servicesLoading ? (
+                  <div className="p-12 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue mx-auto mb-3"></div>
+                    <p className="text-slate-400 text-xs">Querying database services...</p>
+                  </div>
+                ) : servicesError ? (
+                  <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{servicesError}</div>
+                ) : servicesList.length === 0 ? (
+                  <div className="p-12 text-center bg-cardBg border border-borderCustom rounded-xl shadow-sm font-instrument">
+                    <h3 className="font-forum font-bold text-slate-500 text-base mb-1">No Services Available</h3>
+                    <p className="text-xs text-slate-400 mb-4">Create your first service page to get started.</p>
+                    <button onClick={startNewService} className="bg-primaryBlue hover:bg-primaryBlue/90 text-white text-xs py-2 px-4 rounded-lg font-bold">
+                      Create Service
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {servicesList.map((service: any) => (
+                      <div key={service._id || service.id} className="bg-cardBg border border-borderCustom rounded-xl overflow-hidden shadow-sm hover:scale-[1.01] hover:border-primaryBlue/35 transition-all duration-300 flex flex-col justify-between">
+                        <div>
+                          {/* Thumbnail banner preview */}
+                          <div className="relative aspect-[16/9] w-full bg-slate-100 dark:bg-slate-800 overflow-hidden border-b border-borderCustom">
+                            {service.image ? (
+                              <img src={getImageUrl(service.image)} alt={service.title} className="object-cover w-full h-full" />
+                            ) : (
+                              <div className="flex items-center justify-center w-full h-full text-slate-350 bg-slate-100 dark:bg-slate-800">
+                                <LayoutGrid size={48} className="stroke-[1]" />
+                              </div>
+                            )}
+                            <span className={`absolute top-2 left-2 px-2 py-0.5 text-[9px] uppercase font-bold tracking-wider rounded shadow-sm text-white font-instrument font-semibold ${
+                              service.status === 'draft'
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-600'
+                            }`}>
+                              {service.status || 'published'}
+                            </span>
+                            <span className="absolute top-2 right-2 px-2 py-0.5 text-[9px] uppercase font-bold tracking-wider bg-primaryBlue text-white rounded shadow-sm">
+                              {service.slug}
+                            </span>
+                          </div>
+
+                          <div className="p-5 font-instrument">
+                            <h3 className="font-forum font-bold text-lg mb-2 text-[#061143] dark:text-white">{service.title}</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-4 leading-relaxed">{service.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="px-5 pb-5 pt-2 border-t border-borderCustom/60 flex items-center justify-end gap-2.5">
+                          <button
+                            onClick={() => editService(service)}
+                            className="px-3.5 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-xs font-bold rounded-lg transition cursor-pointer"
+                          >
+                            Edit Details
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(service._id || service.id)}
+                            className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-500 hover:text-white border border-rose-100 text-rose-600 text-xs font-bold rounded-lg transition cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : activeTab === 'jobs' ? (
+
           /* ========== JOB OPENINGS MANAGEMENT TAB ========== */
           <div>
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">

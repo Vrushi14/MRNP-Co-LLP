@@ -1,15 +1,36 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, LayoutGroup } from "framer-motion";
 import { servicesData } from "@/data/services";
 
 export function ServiceSidebar({ currentSlug }: { currentSlug: string }) {
+  const [services, setServices] = useState<any[]>(servicesData);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const res = await fetch(`${apiUrl}/services`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.services && data.services.length > 0) {
+            setServices(data.services);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch services in Sidebar:", err);
+      }
+    };
+    fetchServices();
+  }, []);
+
   return (
     <LayoutGroup>
       <nav className="flex flex-col border border-slate-200 shadow-sm bg-white">
-        {servicesData.map((s) => {
+        {services.map((s) => {
           const isActive = s.slug === currentSlug;
           return (
             <Link
@@ -97,6 +118,7 @@ export function AnimatedSection({
 }
 
 export function AnimatedImage({ src, alt }: { src: string; alt: string }) {
+  if (!src) return null;
   return (
     <motion.div
       initial={{ opacity: 1, scale: 1 }}

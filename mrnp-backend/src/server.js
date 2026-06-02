@@ -9,13 +9,20 @@ const jobRoutes = require('./routes/job');
 const emailRoutes = require('./routes/email');
 const notificationRoutes = require('./routes/notification');
 const interviewRoutes = require('./routes/interview');
+const serviceRoutes = require('./routes/service');
+const aboutRoutes = require('./routes/about');
 const connectDB = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+let frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+if (frontendUrl.endsWith('/')) {
+  frontendUrl = frontendUrl.slice(0, -1);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: frontendUrl,
   credentials: true
 }));
 
@@ -34,6 +41,8 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/interviews', interviewRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/about', aboutRoutes);
 
 
 app.use((req, res) => {
