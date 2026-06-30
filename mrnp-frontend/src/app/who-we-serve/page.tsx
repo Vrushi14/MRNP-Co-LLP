@@ -70,7 +70,7 @@ export default function WhoWeServePage() {
               </div>
               <div className="relative flex flex-col items-center justify-center py-12 lg:py-16">
                 <h3 className="font-forum text-5xl lg:text-[5rem] text-primaryBlue mb-4">
-                  <CountUp end={13} duration={2} enableScrollSpy scrollSpyOnce />+
+                  <CountUp end={15} duration={2} enableScrollSpy scrollSpyOnce />+
                 </h3>
                 <p className="font-instrument text-base lg:text-2xl font-medium text-primaryBlue">Years of Excellence</p>
               </div>
