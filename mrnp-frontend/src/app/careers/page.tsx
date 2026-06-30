@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import HereToHelp from "@/components/HereToHelp";
-import { apiClient } from "@/utils/api";
+import { apiClient, authService } from "@/utils/api";
 
 const marqueeImages = [
   "https://res.cloudinary.com/dkhsnhjrh/image/upload/v1773911585/20250302_093152_zvu3n8.png",
@@ -41,6 +41,52 @@ export default function CareersPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [jobsLoading, setJobsLoading] = useState(true);
+
+  const getImageUrl = (imagePath?: string | null): string => {
+    if (!imagePath) return "";
+    if (imagePath.startsWith('/uploads/')) {
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
+      return `${baseUrl}${imagePath}`;
+    }
+    return imagePath;
+  };
+
+  const [content, setContent] = useState<any>({
+    heroTitle: "Join Our Team",
+    heroDescription: "Students, recent graduates, seasoned professionals, and senior leaders constitute integral pillars of our success.",
+    heroImage: "/careers-hero.jpg",
+    cultureSec1Title: "Innovative Collaboration & Dynamic Team Culture",
+    cultureSec1Paragraph1: "At MRNP, our environment fosters collaboration with top-tier talent, visionary thinkers, and industry trailblazers who are at the forefront of forging and sustaining innovative and impactful partnerships.",
+    cultureSec1Paragraph2: "Our organization values a dynamic and resourceful team, characterized by youthfulness and energy, present across all our locations. We firmly uphold the belief that our people define our culture and organization, guiding every decision we make.",
+    cultureSec2Title: "Culture of Excellence",
+    cultureSec2Paragraph1: "At MRNP, our culture is defined by a passionate drive to contribute to global transformation initiatives. We are committed to fostering an environment where creativity flourishes and diverse perspectives thrive. We encourage open expression of ideas and embrace challenges as opportunities for growth and innovation.",
+    cultureSec2Paragraph2: "We value individuals who challenge conventional norms and strive for excellence, as this mindset not only enhances personal satisfaction but also drives collective success. Despite our dynamic and forward-thinking approach, MRNP remains steadfast in upholding core values established over decades: integrity and honesty are paramount in every decision and interaction, regardless of seniority or role within the firm.",
+    marqueeImages: marqueeImages
+  });
+  const [contentLoading, setContentLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        setContentLoading(true);
+        const response = await apiClient.careers.getContent();
+        if (response) {
+          setContent((prev: any) => ({
+            ...prev,
+            ...response,
+            marqueeImages: response.marqueeImages && response.marqueeImages.length > 0
+              ? response.marqueeImages
+              : prev.marqueeImages
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching careers content:", error);
+      } finally {
+        setContentLoading(false);
+      }
+    };
+    fetchContent();
+  }, []);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -95,6 +141,12 @@ export default function CareersPage() {
     setErrorMessage("");
   };
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(authService.isAuthenticated());
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -137,8 +189,50 @@ export default function CareersPage() {
     }
   };
 
+  if (content.status === 'draft' && !isAdmin && !contentLoading) {
+    return (
+      <main className="flex flex-col min-h-screen bg-white">
+        <Navbar />
+        <div className="flex-1 flex flex-col justify-center items-center px-6 py-24 text-center min-h-[60vh]">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-xl space-y-6"
+          >
+            <div className="w-20 h-20 bg-primaryBlue/10 rounded-full flex items-center justify-center mx-auto text-primaryBlue animate-pulse">
+              <Loader2 className="w-10 h-10 animate-spin" />
+            </div>
+            <h1 className="font-forum text-4xl sm:text-5xl text-primaryBlue font-bold">
+              Careers Portal Updating
+            </h1>
+            <p className="font-instrument text-[#191919] text-base sm:text-lg leading-relaxed">
+              We are currently revising our career paths and opening new opportunities for visionary talent. 
+              Our team is working on updates to present you with the best roles. Please check back soon!
+            </p>
+            <div className="pt-4">
+              <a
+                href="/"
+                className="font-instrument inline-flex items-center text-white bg-primaryBlue px-8 py-3.5 hover:bg-primaryBlue/90 transition-all rounded-full shadow-md text-sm font-semibold"
+              >
+                Back to Home
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </a>
+            </div>
+          </motion.div>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
   return (
     <main className="flex flex-col min-h-screen bg-white">
+      {content.status === 'draft' && (
+        <div className="bg-amber-500 text-white text-center py-2 px-4 text-xs font-bold font-instrument tracking-wider sticky top-[72px] z-50 flex items-center justify-center gap-2 shadow-sm">
+          <span>PREVIEW MODE: This page is currently a Draft. Public guests cannot see these updates.</span>
+        </div>
+      )}
       {/* ── HERO ── */}
       <section className="relative bg-primaryBlue pt-32 pb-16 md:pt-40 md:pb-20 lg:pt-44 lg:pb-24">
         <Navbar />
@@ -150,7 +244,7 @@ export default function CareersPage() {
               transition={{ duration: 0.6 }}
               className="font-forum text-4xl md:text-5xl lg:text-6xl xl:text-[5rem] 2xl:text-[6.5rem] md:leading-tight lg:leading-[5rem] xl:leading-[6.5rem] bg-gradient-to-b from-white via-white to-white/60 bg-clip-text text-transparent pb-2"
             >
-              Join Our Team
+              {content.heroTitle}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 40 }}
@@ -158,8 +252,7 @@ export default function CareersPage() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="font-instrument text-base md:text-lg lg:text-xl xl:text-2xl text-white max-w-3xl leading-relaxed"
             >
-              Students, recent graduates, seasoned professionals, and senior
-              leaders constitute integral pillars of our success.
+              {content.heroDescription}
             </motion.p>
           </div>
 
@@ -172,7 +265,7 @@ export default function CareersPage() {
           >
             <div className="relative w-full aspect-[16/10] md:aspect-[16/7] lg:aspect-[15/7]">
               <Image
-                src="/careers-hero.jpg"
+                src={getImageUrl(content.heroImage)}
                 alt="Life @ MRNP & CO LLP"
                 fill
                 className="object-cover shadow-2xl rounded-sm"
@@ -188,20 +281,14 @@ export default function CareersPage() {
         <div className="max-w-[88rem] mx-auto px-6 md:px-12 lg:px-16">
           <div className="space-y-8 md:space-y-12">
             <h2 className="font-forum text-3xl md:text-4xl lg:text-5xl text-[#13234C] leading-tight">
-              Innovative Collaboration & Dynamic Team Culture
+              {content.cultureSec1Title}
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
               <p className="font-instrument text-[#13234C] text-base md:text-xl leading-relaxed">
-                At MRNP, our environment fosters collaboration with top-tier
-                talent, visionary thinkers, and industry trailblazers who are at
-                the forefront of forging and sustaining innovative and impactful
-                partnerships.
+                {content.cultureSec1Paragraph1}
               </p>
               <p className="font-instrument text-[#13234C] text-base md:text-xl leading-relaxed">
-                Our organization values a dynamic and resourceful team,
-                characterized by youthfulness and energy, present across all our
-                locations. We firmly uphold the belief that our people define
-                our culture and organization, guiding every decision we make.
+                {content.cultureSec1Paragraph2}
               </p>
             </div>
           </div>
@@ -213,25 +300,14 @@ export default function CareersPage() {
         <div className="max-w-[88rem] mx-auto px-6 md:px-12 lg:px-16 mb-12 md:mb-16 lg:mb-20">
           <div className="max-w-4xl">
             <h2 className="font-forum text-3xl md:text-4xl lg:text-5xl text-primaryBlue mb-4 md:mb-6">
-              Culture of Excellence
+              {content.cultureSec2Title}
             </h2>
             <div className="font-instrument space-y-4 md:space-y-6 text-[#191919] text-base md:text-lg leading-relaxed">
               <p>
-                At MRNP, our culture is defined by a passionate drive to
-                contribute to global transformation initiatives. We are
-                committed to fostering an environment where creativity flourishes
-                and diverse perspectives thrive. We encourage open expression of
-                ideas and embrace challenges as opportunities for growth and
-                innovation.
+                {content.cultureSec2Paragraph1}
               </p>
               <p>
-                We value individuals who challenge conventional norms and strive
-                for excellence, as this mindset not only enhances personal
-                satisfaction but also drives collective success. Despite our
-                dynamic and forward-thinking approach, MRNP remains steadfast in
-                upholding core values established over decades: integrity and
-                honesty are paramount in every decision and interaction,
-                regardless of seniority or role within the firm.
+                {content.cultureSec2Paragraph2}
               </p>
             </div>
           </div>
@@ -240,13 +316,13 @@ export default function CareersPage() {
         {/* ── INFINITE MARQUEE ── */}
         <div className="overflow-hidden w-full relative animate-marquee-container flex py-8 mt-8">
           <div className="flex w-max animate-marquee space-x-4 md:space-x-8 px-2 md:px-4">
-            {[...marqueeImages, ...marqueeImages, ...marqueeImages].map((imgUrl, idx) => (
+            {[...content.marqueeImages, ...content.marqueeImages, ...content.marqueeImages].map((imgUrl, idx) => (
               <div
                 key={idx}
                 className="relative w-[280px] h-[180px] md:w-[400px] md:h-[260px] lg:w-[450px] lg:h-[300px] flex-shrink-0"
               >
                 <Image
-                  src={imgUrl}
+                  src={getImageUrl(imgUrl)}
                   alt={`MRNP Culture ${idx}`}
                   fill
                   sizes="(max-width: 768px) 280px, (max-width: 1024px) 400px, 450px"

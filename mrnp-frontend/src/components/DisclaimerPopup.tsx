@@ -32,7 +32,7 @@ export default function DisclaimerPopup() {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-8">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -48,17 +48,17 @@ export default function DisclaimerPopup() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.4, type: "spring", bounce: 0 }}
-            className="relative w-full max-w-[800px] overflow-hidden bg-white shadow-2xl flex flex-col"
+            className="relative w-full max-w-[800px] max-h-full overflow-hidden bg-white shadow-2xl flex flex-col rounded-md"
           >
             {/* Header */}
-            <div className="px-8 pt-8 pb-4">
-              <h2 className="text-2xl font-bold text-gray-900 font-inter">
+            <div className="px-6 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 font-inter">
                 Disclaimer
               </h2>
             </div>
 
             {/* Content body */}
-            <div className="px-8 pb-8 text-[15px] leading-relaxed text-gray-800 space-y-5 font-inter">
+            <div className="px-6 pb-6 md:px-8 md:pb-8 text-[14px] md:text-[15px] leading-relaxed text-gray-800 space-y-5 font-inter overflow-y-auto">
               <p>
                 The Institute of Chartered Accountants of India does not permit advertisement or solicitation by Chartered Accountants in any form or manner. By accessing this website, you acknowledge and confirm that you are seeking information relating to MRNP & Co LLP on your own accord and that there has been no form of solicitation, advertisement or inducement by MRNP & Co LLP or its partners or employees.
               </p>
@@ -73,7 +73,7 @@ export default function DisclaimerPopup() {
             </div>
 
             {/* Footer / Actions */}
-            <div className="bg-[#f0f2f5] px-8 py-6 flex flex-col gap-5 border-t border-gray-200 mt-auto">
+            <div className="bg-[#f0f2f5] px-6 py-5 md:px-8 md:py-6 flex flex-col gap-4 md:gap-5 border-t border-gray-200 mt-auto">
               <label className="flex items-start gap-3 cursor-pointer group">
                 <div className="relative flex items-center pt-1">
                   <input
@@ -95,7 +95,7 @@ export default function DisclaimerPopup() {
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 </div>
-                <span className="text-[15px] italic text-[#1b2b41] font-inter">
+                <span className="text-[14px] md:text-[15px] italic text-[#1b2b41] font-inter">
                   I have read and understood above and I agree with the terms of usage of this website.
                 </span>
               </label>
@@ -104,7 +104,7 @@ export default function DisclaimerPopup() {
                 <button
                   onClick={handleProceed}
                   disabled={!isChecked}
-                  className={`px-8 py-2.5 rounded text-[15px] font-medium font-inter transition-all ${
+                  className={`px-8 py-2.5 rounded text-[14px] md:text-[15px] font-medium font-inter transition-all ${
                     isChecked
                       ? "bg-[#1b365d] text-white hover:bg-[#122542] cursor-pointer"
                       : "bg-[#1b365d]/50 text-white/80 cursor-not-allowed"

@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const AllowedEmail = require('../models/AllowedEmail');
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -18,7 +19,15 @@ const register = async (req, res) => {
       return res.status(400).json({ error: 'Email, password, and name are required' });
     }
 
-    const userExists = await User.findOne({ email: email.toLowerCase() });
+    const emailLower = email.toLowerCase().trim();
+
+    // Check if email is in allowed list
+    const isAllowed = await AllowedEmail.findOne({ email: emailLower });
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'Access denied: Your email is not authorized to register an admin account' });
+    }
+
+    const userExists = await User.findOne({ email: emailLower });
     if (userExists) {
       return res.status(400).json({ error: 'User already exists' });
     }
@@ -48,7 +57,15 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const emailLower = email.toLowerCase().trim();
+
+    // Check if email is in allowed list
+    const isAllowed = await AllowedEmail.findOne({ email: emailLower });
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'Access denied: Your email is not authorized to access the admin dashboard' });
+    }
+
+    const user = await User.findOne({ email: emailLower });
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }

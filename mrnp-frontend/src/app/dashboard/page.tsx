@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient, authService } from '@/utils/api';
+import { compressImage } from '@/utils/imageCompressor';
 import { useRouter } from 'next/navigation';
 import {
   Sun,
@@ -29,7 +30,13 @@ import {
   Plus,
   Bell,
   Calendar,
-  LayoutGrid
+  LayoutGrid,
+  User,
+  Shield,
+  Key,
+  Pencil,
+  Phone,
+  Award
 } from 'lucide-react';
 
 import SecuritySettings from '@/components/dashboard/SecuritySettings';
@@ -41,7 +48,7 @@ import DashboardWidgets from '@/components/dashboard/DashboardWidgets';
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'applications' | 'jobs' | 'analytics' | 'profile' | 'interviews' | 'notifications' | 'services' | 'about'>('analytics');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'analytics' | 'profile' | 'interviews' | 'notifications' | 'services' | 'about' | 'careers'>('analytics');
   const router = useRouter();
 
   // Services states
@@ -83,6 +90,26 @@ export default function DashboardPage() {
   const [aboutValues, setAboutValues] = useState<any[]>([]);
   const [aboutPartners, setAboutPartners] = useState<any[]>([]);
 
+  // Careers Page states
+  const [careersLoading, setCareersLoading] = useState(false);
+  const [careersError, setCareersError] = useState('');
+  const [careersSaveSuccess, setCareersSaveSuccess] = useState('');
+  const [careersSaveError, setCareersSaveError] = useState('');
+  const [isUploadingCareersImage, setIsUploadingCareersImage] = useState(false);
+
+  // Careers Page Form State
+  const [careersHeroTitle, setCareersHeroTitle] = useState('');
+  const [careersHeroDescription, setCareersHeroDescription] = useState('');
+  const [careersHeroImage, setCareersHeroImage] = useState('');
+  const [careersCultureSec1Title, setCareersCultureSec1Title] = useState('');
+  const [careersCultureSec1Paragraph1, setCareersCultureSec1Paragraph1] = useState('');
+  const [careersCultureSec1Paragraph2, setCareersCultureSec1Paragraph2] = useState('');
+  const [careersCultureSec2Title, setCareersCultureSec2Title] = useState('');
+  const [careersCultureSec2Paragraph1, setCareersCultureSec2Paragraph1] = useState('');
+  const [careersCultureSec2Paragraph2, setCareersCultureSec2Paragraph2] = useState('');
+  const [careersMarqueeImages, setCareersMarqueeImages] = useState<string[]>([]);
+  const [careersStatus, setCareersStatus] = useState<'published' | 'draft'>('published');
+
 
   // Theme support
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -94,7 +121,26 @@ export default function DashboardPage() {
   const [editing, setEditing] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profileEmail, setProfileEmail] = useState('');
+  const [profileDesignation, setProfileDesignation] = useState('');
+  const [profileIcaiMembership, setProfileIcaiMembership] = useState('');
+  const [profileMemberSince, setProfileMemberSince] = useState('');
+  const [profileOfficeBranch, setProfileOfficeBranch] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileLinkedin, setProfileLinkedin] = useState('');
+  const [profileLocation, setProfileLocation] = useState('');
+  const [profileBadge, setProfileBadge] = useState('');
+  const [profileTeamAssigned, setProfileTeamAssigned] = useState('');
+  const [profileJoinedFirm, setProfileJoinedFirm] = useState('');
   const [profileError, setProfileError] = useState('');
+
+  // Allowed Emails list states
+  const [allowedEmails, setAllowedEmails] = useState<any[]>([]);
+  const [allowedEmailsLoading, setAllowedEmailsLoading] = useState(false);
+  const [allowedEmailsError, setAllowedEmailsError] = useState('');
+  const [newAllowedEmail, setNewAllowedEmail] = useState('');
+  const [addAllowedEmailLoading, setAddAllowedEmailLoading] = useState(false);
+  const [deleteAllowedEmailLoading, setDeleteAllowedEmailLoading] = useState<string | null>(null);
+  const [allowedEmailsSuccess, setAllowedEmailsSuccess] = useState('');
 
   // Notifications and Interviews states
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -203,9 +249,20 @@ export default function DashboardPage() {
         setLoading(true);
         // Fetch profile
         const profileResponse = await apiClient.user.getProfile();
-        setUser(profileResponse.user);
-        setProfileName(profileResponse.user.name);
-        setProfileEmail(profileResponse.user.email);
+        const u = profileResponse.user;
+        setUser(u);
+        setProfileName(u.name || '');
+        setProfileEmail(u.email || '');
+        setProfileDesignation(u.designation || 'Founding Partner');
+        setProfileIcaiMembership(u.icaiMembership || '124567');
+        setProfileMemberSince(u.memberSince || 'March 2004');
+        setProfileOfficeBranch(u.officeBranch || 'Mumbai - HQ');
+        setProfilePhone(u.phone || '+91 98200 00001');
+        setProfileLinkedin(u.linkedin || 'https://linkedin.com');
+        setProfileLocation(u.location || 'Mumbai, MH');
+        setProfileBadge(u.badge || 'FCA');
+        setProfileTeamAssigned(u.teamAssigned || 'Audit team · Tax team');
+        setProfileJoinedFirm(u.joinedFirm || '1 April 2002');
 
         // Fetch applications
         await loadApplications();
@@ -221,6 +278,12 @@ export default function DashboardPage() {
 
         // Fetch services
         await loadServices();
+
+        // Fetch careers page content
+        await loadCareers();
+
+        // Fetch allowed emails list
+        await loadAllowedEmails();
       } catch (err: any) {
         setProfileError(err.message || 'Failed to load profile details.');
       } finally {
@@ -231,6 +294,12 @@ export default function DashboardPage() {
 
     fetchDashboardData();
   }, [router]);
+
+  useEffect(() => {
+    if (activeTab === 'profile') {
+      loadAllowedEmails();
+    }
+  }, [activeTab]);
 
   const loadApplications = async () => {
     try {
@@ -318,6 +387,138 @@ export default function DashboardPage() {
     }
   };
 
+  const loadCareers = async () => {
+    try {
+      setCareersLoading(true);
+      setCareersError('');
+      const res = await apiClient.careers.getContent();
+      setCareersHeroTitle(res.heroTitle || '');
+      setCareersHeroDescription(res.heroDescription || '');
+      setCareersHeroImage(res.heroImage || '');
+      setCareersCultureSec1Title(res.cultureSec1Title || '');
+      setCareersCultureSec1Paragraph1(res.cultureSec1Paragraph1 || '');
+      setCareersCultureSec1Paragraph2(res.cultureSec1Paragraph2 || '');
+      setCareersCultureSec2Title(res.cultureSec2Title || '');
+      setCareersCultureSec2Paragraph1(res.cultureSec2Paragraph1 || '');
+      setCareersCultureSec2Paragraph2(res.cultureSec2Paragraph2 || '');
+      setCareersMarqueeImages(res.marqueeImages || []);
+      setCareersStatus(res.status || 'published');
+    } catch (err: any) {
+      setCareersError(err.message || 'Failed to load Careers Page content.');
+    } finally {
+      setCareersLoading(false);
+    }
+  };
+
+  const loadAllowedEmails = async () => {
+    try {
+      setAllowedEmailsLoading(true);
+      setAllowedEmailsError('');
+      const list = await apiClient.user.getAllowedEmails();
+      setAllowedEmails(list || []);
+    } catch (err: any) {
+      setAllowedEmailsError(err.message || 'Failed to load authorized emails list.');
+    } finally {
+      setAllowedEmailsLoading(false);
+    }
+  };
+
+  const handleAddAllowedEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAllowedEmail) return;
+    try {
+      setAddAllowedEmailLoading(true);
+      setAllowedEmailsError('');
+      setAllowedEmailsSuccess('');
+      const response = await apiClient.user.addAllowedEmail(newAllowedEmail.trim());
+      setAllowedEmailsSuccess(response.message || 'Email authorized successfully.');
+      setNewAllowedEmail('');
+      await loadAllowedEmails();
+    } catch (err: any) {
+      setAllowedEmailsError(err.message || 'Failed to authorize email.');
+    } finally {
+      setAddAllowedEmailLoading(false);
+    }
+  };
+
+  const handleDeleteAllowedEmail = async (id: string) => {
+    if (!confirm('Are you sure you want to revoke access for this email? They will no longer be able to log in to the dashboard.')) {
+      return;
+    }
+    try {
+      setDeleteAllowedEmailLoading(id);
+      setAllowedEmailsError('');
+      setAllowedEmailsSuccess('');
+      const response = await apiClient.user.deleteAllowedEmail(id);
+      setAllowedEmailsSuccess(response.message || 'Email authorization revoked.');
+      await loadAllowedEmails();
+    } catch (err: any) {
+      setAllowedEmailsError(err.message || 'Failed to revoke email authorization.');
+    } finally {
+      setDeleteAllowedEmailLoading(null);
+    }
+  };
+
+  const handleSaveCareers = async (e?: React.FormEvent, statusOverride?: 'published' | 'draft') => {
+    if (e && e.preventDefault) e.preventDefault();
+    const finalStatus = statusOverride || careersStatus;
+    try {
+      setCareersSaveError('');
+      setCareersSaveSuccess('');
+      const careersData = {
+        heroTitle: careersHeroTitle.trim(),
+        heroDescription: careersHeroDescription.trim(),
+        heroImage: careersHeroImage,
+        cultureSec1Title: careersCultureSec1Title.trim(),
+        cultureSec1Paragraph1: careersCultureSec1Paragraph1.trim(),
+        cultureSec1Paragraph2: careersCultureSec1Paragraph2.trim(),
+        cultureSec2Title: careersCultureSec2Title.trim(),
+        cultureSec2Paragraph1: careersCultureSec2Paragraph1.trim(),
+        cultureSec2Paragraph2: careersCultureSec2Paragraph2.trim(),
+        marqueeImages: JSON.stringify(careersMarqueeImages),
+        status: finalStatus
+      };
+
+      await apiClient.careers.updateContent(JSON.stringify(careersData));
+      setCareersStatus(finalStatus);
+      setCareersSaveSuccess(finalStatus === 'draft' ? 'Careers page saved as draft successfully!' : 'Careers page content published successfully!');
+    } catch (err: any) {
+      setCareersSaveError(err.message || 'Failed to update Careers page content.');
+    }
+  };
+
+  const handleCareersImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: 'hero' | 'marquee', index?: number) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+
+    try {
+      setIsUploadingCareersImage(true);
+      setCareersSaveError('');
+      
+      const compressedFile = await compressImage(file);
+      const formData = new FormData();
+      formData.append('image', compressedFile);
+      
+      const res = await apiClient.careers.uploadImage(formData);
+      
+      if (targetType === 'hero') {
+        setCareersHeroImage(res.imageUrl);
+      } else if (targetType === 'marquee') {
+        if (index !== undefined) {
+          const updated = [...careersMarqueeImages];
+          updated[index] = res.imageUrl;
+          setCareersMarqueeImages(updated);
+        } else {
+          setCareersMarqueeImages(prev => [...prev, res.imageUrl]);
+        }
+      }
+    } catch (err: any) {
+      setCareersSaveError(err.message || 'Failed to upload image.');
+    } finally {
+      setIsUploadingCareersImage(false);
+    }
+  };
+
   const handleSaveAbout = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -343,12 +544,15 @@ export default function DashboardPage() {
   const handleAboutImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, targetType: 'commitment' | 'value' | 'partner', index?: number) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('image', file);
 
     try {
       setIsUploadingAboutImage(true);
       setAboutSaveError('');
+      
+      const compressedFile = await compressImage(file);
+      const formData = new FormData();
+      formData.append('image', compressedFile);
+      
       const res = await apiClient.about.uploadImage(formData);
       
       if (targetType === 'commitment') {
@@ -370,22 +574,25 @@ export default function DashboardPage() {
   };
 
   const handleServiceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('image', file);
-
-    try {
-      setIsUploadingImage(true);
-      setServiceSaveError('');
-      const res = await apiClient.services.uploadImage(formData);
-      setServiceImage(res.imageUrl);
-    } catch (err: any) {
-      setServiceSaveError(err.message || 'Failed to upload banner image.');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
+     if (!e.target.files || e.target.files.length === 0) return;
+     const file = e.target.files[0];
+ 
+     try {
+       setIsUploadingImage(true);
+       setServiceSaveError('');
+       
+       const compressedFile = await compressImage(file);
+       const formData = new FormData();
+       formData.append('image', compressedFile);
+       
+       const res = await apiClient.services.uploadImage(formData);
+       setServiceImage(res.imageUrl);
+     } catch (err: any) {
+       setServiceSaveError(err.message || 'Failed to upload banner image.');
+     } finally {
+       setIsUploadingImage(false);
+     }
+   };
 
   const startNewService = () => {
     setEditingServiceId(null);
@@ -723,8 +930,36 @@ export default function DashboardPage() {
     setProfileError('');
 
     try {
-      const response = await apiClient.user.updateProfile(profileName, profileEmail);
-      setUser(response.user);
+      const response = await apiClient.user.updateProfile({
+        name: profileName,
+        email: profileEmail,
+        designation: profileDesignation,
+        icaiMembership: profileIcaiMembership,
+        memberSince: profileMemberSince,
+        officeBranch: profileOfficeBranch,
+        phone: profilePhone,
+        linkedin: profileLinkedin,
+        location: profileLocation,
+        badge: profileBadge,
+        teamAssigned: profileTeamAssigned,
+        joinedFirm: profileJoinedFirm
+      });
+
+      const u = response.user;
+      setUser(u);
+      setProfileName(u.name || '');
+      setProfileEmail(u.email || '');
+      setProfileDesignation(u.designation || 'Founding Partner');
+      setProfileIcaiMembership(u.icaiMembership || '124567');
+      setProfileMemberSince(u.memberSince || 'March 2004');
+      setProfileOfficeBranch(u.officeBranch || 'Mumbai - HQ');
+      setProfilePhone(u.phone || '+91 98200 00001');
+      setProfileLinkedin(u.linkedin || 'https://linkedin.com');
+      setProfileLocation(u.location || 'Mumbai, MH');
+      setProfileBadge(u.badge || 'FCA');
+      setProfileTeamAssigned(u.teamAssigned || 'Audit team · Tax team');
+      setProfileJoinedFirm(u.joinedFirm || '1 April 2002');
+
       setEditing(false);
     } catch (err: any) {
       setProfileError(err.message || 'Failed to update profile information.');
@@ -1052,7 +1287,7 @@ MRNP Managing Partners`);
       <aside 
         className={`fixed inset-y-0 left-0 transform ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:relative md:translate-x-0 z-40 w-72 bg-cardBg border-r border-borderCustom p-6 flex flex-col justify-between shrink-0 transition-transform duration-300 ease-in-out`}
+        } md:sticky md:top-0 md:h-screen md:overflow-y-auto md:translate-x-0 z-40 w-72 bg-cardBg border-r border-borderCustom p-6 flex flex-col justify-between shrink-0 transition-transform duration-300 ease-in-out`}
       >
         <div>
           {/* Sidebar Logo Header */}
@@ -1117,7 +1352,7 @@ MRNP Managing Partners`);
             </button>
 
             <button
-              onClick={() => { setActiveTab('jobs'); loadJobs(); setIsMobileOpen(false); }}
+              onClick={() => { setActiveTab('jobs'); loadJobs(); loadApplications(); setIsMobileOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'jobs'
                   ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
@@ -1125,7 +1360,7 @@ MRNP Managing Partners`);
               }`}
             >
               <Users size={18} />
-              Manage Openings
+              Manage Jobs & Applications
               {jobsList.length > 0 && (
                 <span className="ml-auto bg-primaryBlue/10 dark:bg-slate-800 text-primaryBlue text-[10px] font-bold px-2 py-0.5 rounded-full border border-primaryBlue/20">
                   {jobsList.length}
@@ -1163,16 +1398,17 @@ MRNP Managing Partners`);
             </button>
 
             <button
-              onClick={() => { setActiveTab('applications'); setIsMobileOpen(false); }}
+              onClick={() => { setActiveTab('careers'); loadCareers(); setIsMobileOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                activeTab === 'applications'
+                activeTab === 'careers'
                   ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
                   : 'text-slate-600 dark:text-slate-400 hover:text-primaryBlue hover:bg-background/80'
               }`}
             >
               <Briefcase size={18} />
-              Applications
+              Manage Careers Page
             </button>
+
 
             <button
               onClick={() => { setActiveTab('interviews'); loadInterviews(); setIsMobileOpen(false); }}
@@ -1204,7 +1440,7 @@ MRNP Managing Partners`);
             </button>
 
             <button
-              onClick={() => { setActiveTab('profile'); setIsMobileOpen(false); }}
+              onClick={() => { setActiveTab('profile'); loadAllowedEmails(); setIsMobileOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
                 activeTab === 'profile'
                   ? 'bg-primaryBlue text-white shadow-md shadow-[#061143]/20'
@@ -1239,7 +1475,268 @@ MRNP Managing Partners`);
       {/* Main Workspace Frame container */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full transition-all duration-300">
         
-        {activeTab === 'about' ? (
+        {activeTab === 'careers' ? (
+          /* ========== CAREERS CONTENT MANAGEMENT TAB ========== */
+          <div>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue dark:text-white">Manage Careers Page</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Directly manage, edit text content, hero image, and marquee gallery for the Careers (Life@mrnp) page.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadCareers}
+                className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom shadow-sm flex items-center gap-2 self-start cursor-pointer hover:border-primaryBlue/30 transition animate-all duration-300"
+              >
+                <Plus size={14} />
+                Refresh Content
+              </button>
+            </div>
+
+            {careersLoading ? (
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue mx-auto mb-3"></div>
+                <p className="text-slate-400 text-xs">Querying database Careers page content...</p>
+              </div>
+            ) : careersError ? (
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{careersError}</div>
+            ) : (
+              <form onSubmit={handleSaveCareers} className="bg-cardBg border border-borderCustom rounded-xl p-6 shadow-sm space-y-6">
+                <div className="flex justify-between items-center border-b border-borderCustom pb-4">
+                  <h2 className="text-lg font-forum font-bold text-primaryBlue dark:text-white flex items-center gap-2">
+                    <Plus size={18} />
+                    Edit Careers Page Content
+                  </h2>
+                  <span className={`px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded shadow-sm text-white font-instrument ${
+                    careersStatus === 'draft' ? 'bg-amber-500' : 'bg-emerald-600'
+                  }`}>
+                    {careersStatus}
+                  </span>
+                </div>
+
+                {careersSaveError && (
+                  <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-700 text-xs rounded-lg">{careersSaveError}</div>
+                )}
+
+                {careersSaveSuccess && (
+                  <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-emerald-700 text-xs rounded-lg">{careersSaveSuccess}</div>
+                )}
+
+                {/* Section 1: Hero Section */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4">
+                  <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">1. Hero Header Section</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-instrument">
+                    {/* Image Upload */}
+                    <div className="space-y-2">
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Hero Background Image</label>
+                      <div className="border border-dashed border-borderCustom rounded-xl p-4 bg-background/40 flex flex-col items-center justify-center text-center relative overflow-hidden h-[180px] group">
+                        {isUploadingCareersImage ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primaryBlue"></div>
+                            <p className="text-[10px] text-slate-400">Uploading...</p>
+                          </div>
+                        ) : careersHeroImage ? (
+                          <>
+                            <img src={getImageUrl(careersHeroImage)} alt="Careers Hero" className="object-cover w-full h-full absolute inset-0" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <label className="bg-white/95 text-primaryBlue px-3 py-1.5 rounded-full text-[10px] font-bold cursor-pointer hover:scale-105 transition shadow">
+                                Change Image
+                                <input type="file" onChange={e => handleCareersImageUpload(e, 'hero')} className="hidden" accept="image/*" />
+                              </label>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2.5">
+                            <LayoutGrid size={32} className="text-slate-400 stroke-[1.25]" />
+                            <div>
+                              <label className="text-primaryBlue hover:underline text-xs font-bold cursor-pointer">
+                                Upload image
+                                <input type="file" onChange={e => handleCareersImageUpload(e, 'hero')} className="hidden" accept="image/*" />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Text Fields */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Hero Title *</label>
+                        <input
+                          type="text"
+                          value={careersHeroTitle}
+                          onChange={e => setCareersHeroTitle(e.target.value)}
+                          placeholder="e.g. Join Our Team"
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Hero Subtitle / Description *</label>
+                        <textarea
+                          rows={3}
+                          value={careersHeroDescription}
+                          onChange={e => setCareersHeroDescription(e.target.value)}
+                          placeholder="Students, recent graduates, seasoned professionals..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Culture Section 1 */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4">
+                  <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">2. Culture Section 1: Innovative Collaboration</h3>
+                  <div className="grid grid-cols-1 gap-4 font-instrument">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Section Title *</label>
+                      <input
+                        type="text"
+                        value={careersCultureSec1Title}
+                        onChange={e => setCareersCultureSec1Title(e.target.value)}
+                        placeholder="e.g. Innovative Collaboration & Dynamic Team Culture"
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Paragraph 1 *</label>
+                        <textarea
+                          rows={4}
+                          value={careersCultureSec1Paragraph1}
+                          onChange={e => setCareersCultureSec1Paragraph1(e.target.value)}
+                          placeholder="At MRNP, our environment fosters..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Paragraph 2 *</label>
+                        <textarea
+                          rows={4}
+                          value={careersCultureSec1Paragraph2}
+                          onChange={e => setCareersCultureSec1Paragraph2(e.target.value)}
+                          placeholder="Our organization values..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Culture Section 2 */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4">
+                  <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">3. Culture Section 2: Culture of Excellence</h3>
+                  <div className="grid grid-cols-1 gap-4 font-instrument">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Section Title *</label>
+                      <input
+                        type="text"
+                        value={careersCultureSec2Title}
+                        onChange={e => setCareersCultureSec2Title(e.target.value)}
+                        placeholder="e.g. Culture of Excellence"
+                        className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 font-semibold"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Paragraph 1 *</label>
+                        <textarea
+                          rows={4}
+                          value={careersCultureSec2Paragraph1}
+                          onChange={e => setCareersCultureSec2Paragraph1(e.target.value)}
+                          placeholder="At MRNP, our culture is defined..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Paragraph 2 *</label>
+                        <textarea
+                          rows={4}
+                          value={careersCultureSec2Paragraph2}
+                          onChange={e => setCareersCultureSec2Paragraph2(e.target.value)}
+                          placeholder="We value individuals who challenge..."
+                          className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground placeholder:text-slate-400 resize-none leading-relaxed"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 4: Marquee Images Gallery */}
+                <div className="bg-background/20 p-5 rounded-xl border border-borderCustom/60 space-y-4 font-instrument">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">4. Marquee Carousel Gallery</h3>
+                    <div>
+                      <label className="px-3 py-1.5 bg-primaryBlue hover:opacity-90 text-white text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1">
+                        <Plus size={12} />
+                        Add Image
+                        <input type="file" onChange={e => handleCareersImageUpload(e, 'marquee')} className="hidden" accept="image/*" />
+                      </label>
+                    </div>
+                  </div>
+
+                  {careersMarqueeImages.length === 0 ? (
+                    <div className="p-8 text-center border border-borderCustom border-dashed rounded-xl text-slate-400 text-xs">
+                      No marquee images defined. Click "Add Image" to build the carousel gallery.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {careersMarqueeImages.map((img, idx) => (
+                        <div key={idx} className="bg-background/30 border border-borderCustom p-2 rounded-xl relative group overflow-hidden h-[120px]">
+                          <img src={getImageUrl(img)} alt={`Marquee ${idx}`} className="w-full h-full object-cover rounded-lg" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                            <label className="cursor-pointer text-[9px] text-primaryBlue font-bold px-2 py-1 bg-white rounded shadow hover:scale-105 transition">
+                              Change
+                              <input type="file" onChange={e => handleCareersImageUpload(e, 'marquee', idx)} className="hidden" accept="image/*" />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...careersMarqueeImages];
+                                updated.splice(idx, 1);
+                                setCareersMarqueeImages(updated);
+                              }}
+                              className="text-[9px] text-rose-600 font-bold px-2 py-1 bg-white rounded shadow hover:scale-105 transition cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Save and Publish bottom row */}
+                <div className="border-t border-borderCustom/60 pt-5 flex justify-end gap-3 font-instrument">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCareers(undefined, 'draft')}
+                    className="px-6 py-2.5 border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold rounded-full transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Save as Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCareers(undefined, 'published')}
+                    className="px-8 py-2.5 bg-primaryBlue hover:bg-primaryBlue/90 text-white text-xs font-bold rounded-full shadow-md shadow-[#061143]/15 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    Publish
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        ) : activeTab === 'about' ? (
           /* ========== ABOUT US MANAGEMENT TAB ========== */
           <div>
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
@@ -2063,16 +2560,29 @@ MRNP Managing Partners`);
           <div>
             <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
               <div>
-                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Manage Job Openings</h1>
-                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Publish new roles and manage live openings visible to prospective candidates.</p>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Manage Jobs & Applications</h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Post new job openings, manage live postings, and review candidate applications.</p>
               </div>
-              <button
-                onClick={loadJobs}
-                className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom shadow-sm flex items-center gap-2 self-start cursor-pointer hover:border-primaryBlue/30 transition"
-              >
-                <Plus size={14} />
-                Refresh List
-              </button>
+              <div className="flex gap-2 self-start flex-wrap font-instrument">
+                <button
+                  onClick={async () => {
+                    await loadJobs();
+                    await loadApplications();
+                  }}
+                  className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom shadow-sm flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Clock size={14} className="text-slate-500" />
+                  Refresh All Data
+                </button>
+                <button
+                  onClick={() => exportToCSV()}
+                  disabled={filteredApps.length === 0}
+                  className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2.5 px-5 rounded-full shadow-sm transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <Download size={14} className="text-white" />
+                  Export Applications (CSV)
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -2264,236 +2774,11 @@ MRNP Managing Partners`);
               </div>
 
             </div>
-          </div>
 
-        ) : activeTab === 'analytics' ? (
-          /* ========== ADVANCED ANALYTICS DASHBOARD TAB ========== */
-          <div>
-            <div className="mb-6">
-              <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Metrics & Analytics Overview</h1>
-              <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Review detailed charts, candidate distribution matrices, and hiring trajectories.</p>
-            </div>
-
-            {/* Dashboard Widgets */}
-            <DashboardWidgets
-              applications={applications}
-              interviews={interviews}
-              setActiveTab={setActiveTab}
-              openAppDetails={openAppDetails}
-            />
-
-            {/* Grid for Charts */}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              
-              {/* Chart 1: Hiring Trend (SVG Area Chart) */}
-              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <TrendingUp size={16} className="text-primaryBlue" />
-                  Hiring Trend & Applications Volume
-                </h3>
-                <div className="relative h-60 w-full flex items-end">
-                  {/* SVG Chart */}
-                  <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="gradientTrend" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--primary-blue)" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="var(--primary-blue)" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    {/* Grid Lines */}
-                    <line x1="0" y1="50" x2="500" y2="50" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
-                    <line x1="0" y1="100" x2="500" y2="100" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
-                    <line x1="0" y1="150" x2="500" y2="150" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
-                    
-                    {/* Path Drawing */}
-                    <path
-                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60"
-                      fill="none"
-                      stroke="var(--primary-blue)"
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                    />
-                    
-                    {/* Gradient Fill under Path */}
-                    <path
-                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60 L 500,200 Z"
-                      fill="url(#gradientTrend)"
-                    />
-                    
-                    {/* Hotspots / Circles */}
-                    <circle cx="71" cy="160" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="142" cy="120" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="213" cy="150" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="284" cy="80" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="355" cy="140" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="426" cy="110" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                    <circle cx="500" cy="60" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
-                  </svg>
-                </div>
-                
-                {/* Custom X Axis Labels */}
-                <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1 font-mono uppercase font-bold">
-                  {hiringTrendData.map((d, i) => (
-                    <span key={i}>{d.label}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Chart 2: Department-wise Distribution (Donut Chart) */}
-              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Users size={16} className="text-primaryBlue" />
-                  Department Applications Ratio
-                </h3>
-                <div className="flex flex-col sm:flex-row items-center justify-around gap-6 h-60">
-                  {/* SVG Donut Circle */}
-                  <div className="relative w-40 h-40">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      {/* Background circle ring */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--border-color)" strokeWidth="8" />
-                      
-                      {/* Segment rings (simulated breakdown of standard IT, Tax, Audit, HR) */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="0" />
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="80" />
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="140" />
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ec4899" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="200" />
-                    </svg>
-                    {/* Inside metrics total display */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold font-forum">{stats.total}</span>
-                      <span className="text-[9px] uppercase tracking-widest text-slate-400 font-semibold">Total</span>
-                    </div>
-                  </div>
-
-                  {/* Legends list */}
-                  <div className="flex-1 space-y-2 max-w-[200px] w-full text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-medium">
-                        <span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block"></span>
-                        IT / Technology
-                      </span>
-                      <span className="font-mono font-bold">{deptCounts['IT'] || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-medium">
-                        <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span>
-                        Audit & Assurance
-                      </span>
-                      <span className="font-mono font-bold">{deptCounts['Audit'] || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-medium">
-                        <span className="w-2.5 h-2.5 rounded bg-amber-50 inline-block bg-amber-500"></span>
-                        Tax Advisory
-                      </span>
-                      <span className="font-mono font-bold">{deptCounts['Tax'] || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-medium">
-                        <span className="w-2.5 h-2.5 rounded bg-pink-500 inline-block"></span>
-                        HR & Admin
-                      </span>
-                      <span className="font-mono font-bold">{deptCounts['HR'] || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart 3: Candidate Experience breakdown (Sleek Bar Chart) */}
-              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <TrendingUp size={16} className="text-primaryBlue" />
-                  Candidate Experience Distribution
-                </h3>
-                <div className="h-60 flex flex-col justify-between pt-4">
-                  {Object.entries(experienceDistribution).map(([label, count]: any) => {
-                    const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                    return (
-                      <div key={label} className="space-y-1">
-                        <div className="flex justify-between text-xs font-semibold">
-                          <span>{label}</span>
-                          <span className="text-slate-400 font-mono">{count} applicants ({Math.round(pct)}%)</span>
-                        </div>
-                        <div className="w-full h-3.5 bg-background border border-borderCustom rounded-full overflow-hidden">
-                          <div 
-                            style={{ width: `${Math.max(pct, 5)}%` }}
-                            className="h-full bg-gradient-to-r from-primaryBlue to-[#60a5fa] rounded-full transition-all duration-1000"
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Chart 4: Monthly Hiring Activity (Horizontal Bar visual) */}
-              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Clock size={16} className="text-primaryBlue" />
-                  Monthly Pipeline Trends
-                </h3>
-                
-                <div className="relative h-60 w-full flex items-end justify-between px-2 pt-6">
-                  {/* Grid background lines */}
-                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
-                    <div className="border-b border-borderCustom/60 w-full"></div>
-                    <div className="border-b border-borderCustom/60 w-full"></div>
-                    <div className="border-b border-borderCustom/60 w-full"></div>
-                    <div className="border-b border-borderCustom/60 w-full"></div>
-                  </div>
-
-                  {/* Vertical Bars */}
-                  {[
-                    { label: 'Jan', val: 12 },
-                    { label: 'Feb', val: 18 },
-                    { label: 'Mar', val: 26 },
-                    { label: 'Apr', val: 14 },
-                    { label: 'May', val: stats.total || 8 }
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex flex-col items-center gap-2 z-10 w-[14%]">
-                      <span className="text-[10px] font-bold font-mono text-primaryBlue">{item.val}</span>
-                      <div 
-                        style={{ height: `${Math.max((item.val / 30) * 150, 20)}px` }}
-                        className="w-full bg-primaryBlue/10 border border-primaryBlue/20 hover:bg-primaryBlue/20 rounded-t-lg transition-all duration-500"
-                      ></div>
-                      <span className="text-[10px] font-bold text-slate-400 font-mono">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        ) : activeTab === 'applications' ? (
-          /* ========== MAIN APPLICATIONS PIPELINE TAB ========== */
-          <div>
-            
-            {/* Main top welcome bar */}
-            <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Job Applications Dashboard</h1>
-                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Review details, manage documents, and automate hiring communication.</p>
-              </div>
-
-              {/* Sync controls */}
-              <div className="flex gap-2 self-start flex-wrap font-instrument">
-                <button
-                  onClick={loadApplications}
-                  className="bg-cardBg hover:bg-background text-foreground font-semibold text-xs py-2.5 px-4 rounded-lg border border-borderCustom transition flex items-center gap-2 shadow-sm cursor-pointer"
-                >
-                  <Clock size={14} className="text-slate-500" />
-                  Sync Database
-                </button>
-                <button
-                  onClick={() => exportToCSV()}
-                  disabled={filteredApps.length === 0}
-                  className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2.5 px-5 rounded-full shadow-sm transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  <Download size={14} className="text-white" />
-                  Export All (CSV)
-                </button>
-              </div>
+            {/* Divider & Candidate Applications Section Header */}
+            <div className="border-t border-borderCustom my-8 pt-8">
+              <h2 className="text-xl md:text-2xl font-forum font-bold tracking-wide text-primaryBlue dark:text-white mb-1">Candidate Applications Pipeline</h2>
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mb-6 font-instrument">Review and filter candidate profiles, download resumes, and manage pipeline status.</p>
             </div>
 
             {/* Stunning dashboard widgets section */}
@@ -2538,24 +2823,20 @@ MRNP Managing Partners`);
                 </div>
               </div>
 
-              {/* Widget 4: Quick Actions */}
-              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group">
+              {/* Widget 4: Shortlisted Count */}
+              <div className="bg-cardBg border border-borderCustom p-4 rounded-xl shadow-sm flex items-center justify-between relative overflow-hidden group font-instrument">
                 <div className="w-full">
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold mb-1">Quick Action</p>
-                  <button 
-                    onClick={() => { setActiveTab('jobs'); loadJobs(); }}
-                    className="w-full py-1.5 px-3 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white dark:bg-slate-800 text-primaryBlue text-[11px] font-bold rounded-lg border border-primaryBlue/10 transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Plus size={12} />
-                    Post New Job Role
-                  </button>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-semibold mb-1">Shortlisted</p>
+                  <h3 className="text-2xl font-forum font-bold text-primaryBlue mt-0.5">
+                    {applications.filter(a => localStorage.getItem(`mrnp_status_${a.id || a._id}`) === 'Shortlisted').length}
+                  </h3>
                 </div>
               </div>
             </section>
 
             {/* Filtering Control panel */}
             <section className="bg-cardBg border border-borderCustom p-5 rounded-xl shadow-sm mb-6 font-instrument">
-              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Filter size={16} className="text-primaryBlue" />
                 Advanced Filters & Query Search
               </h2>
@@ -2883,6 +3164,207 @@ MRNP Managing Partners`);
               )}
             </section>
           </div>
+
+        ) : activeTab === 'analytics' ? (
+          /* ========== ADVANCED ANALYTICS DASHBOARD TAB ========== */
+          <div>
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-forum font-bold tracking-wide text-primaryBlue">Metrics & Analytics Overview</h1>
+              <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Review detailed charts, candidate distribution matrices, and hiring trajectories.</p>
+            </div>
+
+            {/* Dashboard Widgets */}
+            <DashboardWidgets
+              applications={applications}
+              interviews={interviews}
+              setActiveTab={setActiveTab}
+              openAppDetails={openAppDetails}
+            />
+
+            {/* Grid for Charts */}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              
+              {/* Chart 1: Hiring Trend (SVG Area Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-primaryBlue" />
+                  Hiring Trend & Applications Volume
+                </h3>
+                <div className="relative h-60 w-full flex items-end">
+                  {/* SVG Chart */}
+                  <svg className="w-full h-full" viewBox="0 0 500 200" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="gradientTrend" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--primary-blue)" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="var(--primary-blue)" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    {/* Grid Lines */}
+                    <line x1="0" y1="50" x2="500" y2="50" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    <line x1="0" y1="100" x2="500" y2="100" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    <line x1="0" y1="150" x2="500" y2="150" stroke="var(--border-color)" strokeWidth="0.5" strokeDasharray="4" />
+                    
+                    {/* Path Drawing */}
+                    <path
+                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60"
+                      fill="none"
+                      stroke="var(--primary-blue)"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                    />
+                    
+                    {/* Gradient Fill under Path */}
+                    <path
+                      d="M 0,200 L 71,160 L 142,120 L 213,150 L 284,80 L 355,140 L 426,110 L 500,60 L 500,200 Z"
+                      fill="url(#gradientTrend)"
+                    />
+                    
+                    {/* Hotspots / Circles */}
+                    <circle cx="71" cy="160" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="142" cy="120" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="213" cy="150" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="284" cy="80" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="355" cy="140" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="426" cy="110" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                    <circle cx="500" cy="60" r="5" fill="var(--primary-blue)" className="hover:scale-150 transition" />
+                  </svg>
+                </div>
+                
+                {/* Custom X Axis Labels */}
+                <div className="flex justify-between text-[10px] text-slate-400 mt-2 px-1 font-mono uppercase font-bold">
+                  {hiringTrendData.map((d, i) => (
+                    <span key={i}>{d.label}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart 2: Department-wise Distribution (Donut Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Users size={16} className="text-primaryBlue" />
+                  Department Applications Ratio
+                </h3>
+                <div className="flex flex-col sm:flex-row items-center justify-around gap-6 h-60">
+                  {/* SVG Donut Circle */}
+                  <div className="relative w-40 h-40">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      {/* Background circle ring */}
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--border-color)" strokeWidth="8" />
+                      
+                      {/* Segment rings (simulated breakdown of standard IT, Tax, Audit, HR) */}
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="0" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="80" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="140" />
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ec4899" strokeWidth="8" strokeDasharray="251.2" strokeDashoffset="200" />
+                    </svg>
+                    {/* Inside metrics total display */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-bold font-forum">{stats.total}</span>
+                      <span className="text-[9px] uppercase tracking-widest text-slate-400 font-semibold">Total</span>
+                    </div>
+                  </div>
+
+                  {/* Legends list */}
+                  <div className="flex-1 space-y-2 max-w-[200px] w-full text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-blue-500 inline-block"></span>
+                        IT / Technology
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['IT'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span>
+                        Audit & Assurance
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['Audit'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-amber-50 inline-block bg-amber-500"></span>
+                        Tax Advisory
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['Tax'] || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-2.5 h-2.5 rounded bg-pink-500 inline-block"></span>
+                        HR & Admin
+                      </span>
+                      <span className="font-mono font-bold">{deptCounts['HR'] || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart 3: Candidate Experience breakdown (Sleek Bar Chart) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <TrendingUp size={16} className="text-primaryBlue" />
+                  Candidate Experience Distribution
+                </h3>
+                <div className="h-60 flex flex-col justify-between pt-4">
+                  {Object.entries(experienceDistribution).map(([label, count]: any) => {
+                    const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                    return (
+                      <div key={label} className="space-y-1">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span>{label}</span>
+                          <span className="text-slate-400 font-mono">{count} applicants ({Math.round(pct)}%)</span>
+                        </div>
+                        <div className="w-full h-3.5 bg-background border border-borderCustom rounded-full overflow-hidden">
+                          <div 
+                            style={{ width: `${Math.max(pct, 5)}%` }}
+                            className="h-full bg-gradient-to-r from-primaryBlue to-[#60a5fa] rounded-full transition-all duration-1000"
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Chart 4: Monthly Hiring Activity (Horizontal Bar visual) */}
+              <div className="bg-cardBg border border-borderCustom rounded-xl p-5 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <Clock size={16} className="text-primaryBlue" />
+                  Monthly Pipeline Trends
+                </h3>
+                
+                <div className="relative h-60 w-full flex items-end justify-between px-2 pt-6">
+                  {/* Grid background lines */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                    <div className="border-b border-borderCustom/60 w-full"></div>
+                  </div>
+
+                  {/* Vertical Bars */}
+                  {[
+                    { label: 'Jan', val: 12 },
+                    { label: 'Feb', val: 18 },
+                    { label: 'Mar', val: 26 },
+                    { label: 'Apr', val: 14 },
+                    { label: 'May', val: stats.total || 8 }
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col items-center gap-2 z-10 w-[14%]">
+                      <span className="text-[10px] font-bold font-mono text-primaryBlue">{item.val}</span>
+                      <div 
+                        style={{ height: `${Math.max((item.val / 30) * 150, 20)}px` }}
+                        className="w-full bg-primaryBlue/10 border border-primaryBlue/20 hover:bg-primaryBlue/20 rounded-t-lg transition-all duration-500"
+                      ></div>
+                      <span className="text-[10px] font-bold text-slate-400 font-mono">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         ) : activeTab === 'interviews' ? (
           /* ========== INTERVIEW SCHEDULER TAB ========== */
           <div>
@@ -2895,105 +3377,509 @@ MRNP Managing Partners`);
           </div>
         ) : (
           
-          /* ========== USER ADMINISTRATOR PROFILE TAB ========== */
-
-          <div className="max-w-xl mx-auto font-instrument">
-            <div className="mb-6">
-              <h1 className="text-2xl md:text-3xl font-forum font-bold text-primaryBlue">Admin Account Settings</h1>
-              <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Manage credentials and local workspace properties.</p>
+          /* ========== USER ADMINISTRATOR PROFILE TAB ========== */          <div className="max-w-5xl mx-auto font-instrument animate-fade-in-up space-y-8">
+            {/* Header section with page title */}
+            <div className="border-b border-borderCustom/60 pb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-forum font-bold text-primaryBlue flex items-center gap-2.5">
+                  <User className="text-primaryBlue/80 w-7 h-7" />
+                  Admin Account Settings
+                </h1>
+                <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400">Manage credentials, administrative parameters and system access.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">System Secure Session</span>
+              </div>
             </div>
 
-            <div className="bg-cardBg border border-borderCustom rounded-xl p-6 relative overflow-hidden shadow-sm">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primaryBlue/5 rounded-full blur-3xl"></div>
+            {/* Error banner if save fails */}
+            {profileError && (
+              <div className="bg-rose-50 dark:bg-rose-955 border border-rose-250 dark:border-rose-900/30 text-rose-700 dark:text-rose-400 p-3.5 rounded-xl text-xs flex items-center gap-2 animate-fade-in shadow-sm">
+                <span className="text-rose-500 font-bold">⚠️</span>
+                <span>{profileError}</span>
+              </div>
+            )}
 
-              {profileError && (
-                <div className="bg-rose-50 border border-rose-250 text-rose-700 p-3 rounded-lg mb-6 text-xs">{profileError}</div>
-              )}
-
-              {!editing ? (
-                <div className="space-y-6">
-                  {/* Visual avatar summary */}
-                  <div className="flex items-center gap-4 pb-5 border-b border-borderCustom">
-                    <div className="w-14 h-14 rounded-full bg-primaryBlue/10 flex items-center justify-center text-primaryBlue text-xl font-bold uppercase shadow-sm">
-                      {user?.name?.substring(0, 2) || 'AD'}
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold font-forum">{user?.name}</h2>
-                      <span className="text-[10px] text-primaryBlue font-semibold uppercase tracking-wider block">Super Administrator</span>
-                    </div>
+            {/* Form wrapping header and cards */}
+            <form onSubmit={handleUpdateProfile} className="space-y-6">
+              {/* Visual profile header card */}
+              <div className="bg-cardBg border border-borderCustom p-6 rounded-2xl relative overflow-hidden shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primaryBlue/5 rounded-full blur-3xl"></div>
+                
+                <div className="flex items-center gap-4 z-10">
+                  {/* Circular Initials Avatar */}
+                  <div className="w-20 h-20 rounded-full bg-primaryBlue/10 border border-primaryBlue/20 flex items-center justify-center text-primaryBlue text-2xl font-bold font-forum uppercase shrink-0 shadow-sm">
+                    {profileName?.substring(0, 2) || 'AD'}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-slate-450 text-[10px] uppercase font-bold tracking-wider">Access Name</p>
-                      <p className="text-sm font-bold mt-0.5">{user?.name}</p>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl md:text-2xl font-forum font-bold text-foreground">{profileName}</h2>
+                      {profileBadge && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-primaryBlue/10 text-primaryBlue border border-primaryBlue/20 text-[9px] font-bold uppercase tracking-wider">
+                          {profileBadge}
+                        </span>
+                      )}
                     </div>
-
-                    <div>
-                      <p className="text-slate-450 text-[10px] uppercase font-bold tracking-wider">Credential Email</p>
-                      <p className="text-sm font-bold mt-0.5 truncate">{user?.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm transition flex items-center gap-2 cursor-pointer"
-                    >
-                      Modify Settings
-                    </button>
+                    <p className="text-xs md:text-sm text-slate-500 mt-1 dark:text-slate-400 flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium">{profileDesignation}</span>
+                      <span className="text-slate-300 dark:text-slate-700">•</span>
+                      <span className="font-medium">{profileLocation}</span>
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">Access Name</label>
-                    <input
-                      type="text"
-                      value={profileName}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground"
-                      required
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-350 text-xs font-semibold mb-1">Access Email Address</label>
-                    <input
-                      type="email"
-                      value={profileEmail}
-                      onChange={(e) => setProfileEmail(e.target.value)}
-                      className="w-full px-3 py-2 bg-background border border-borderCustom focus:border-primaryBlue focus:outline-none transition rounded text-xs text-foreground"
-                      required
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="submit"
-                      className="bg-primaryBlue hover:opacity-90 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm transition cursor-pointer"
-                    >
-                      Save Configuration
-                    </button>
+                <div className="z-10 shrink-0">
+                  {!editing ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditing(false);
-                        setProfileName(user?.name);
-                        setProfileEmail(user?.email);
-                        setProfileError('');
-                      }}
-                      className="bg-cardBg hover:bg-background text-foreground border border-borderCustom font-semibold text-xs py-2 px-5 rounded-full transition cursor-pointer"
+                      onClick={() => setEditing(true)}
+                      className="border border-borderCustom hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs py-2 px-4 rounded-full transition flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
-                      Cancel
+                      <Pencil size={12} />
+                      Edit profile
                     </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        className="bg-primaryBlue hover:opacity-95 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-md transition-all duration-305 cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditing(false);
+                          setProfileName(user?.name || '');
+                          setProfileEmail(user?.email || '');
+                          setProfileDesignation(user?.designation || 'Founding Partner');
+                          setProfileIcaiMembership(user?.icaiMembership || '124567');
+                          setProfileMemberSince(user?.memberSince || 'March 2004');
+                          setProfileOfficeBranch(user?.officeBranch || 'Mumbai - HQ');
+                          setProfilePhone(user?.phone || '+91 98200 00001');
+                          setProfileLinkedin(user?.linkedin || 'https://linkedin.com');
+                          setProfileLocation(user?.location || 'Mumbai, MH');
+                          setProfileBadge(user?.badge || 'FCA');
+                          setProfileTeamAssigned(user?.teamAssigned || 'Audit team · Tax team');
+                          setProfileJoinedFirm(user?.joinedFirm || '1 April 2002');
+                          setProfileError('');
+                        }}
+                        className="bg-cardBg hover:bg-background text-slate-700 dark:text-slate-350 border border-borderCustom font-semibold text-xs py-2 px-5 rounded-full transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Three Details Cards */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* PERSONAL DETAILS CARD */}
+                <div className="bg-cardBg border border-borderCustom rounded-2xl p-5 shadow-sm space-y-4">
+                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-borderCustom/60">
+                    <User size={14} className="text-primaryBlue" />
+                    Personal Details
+                  </h3>
+                  <div className="divide-y divide-borderCustom/60">
+                    {/* Full Name */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <User size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Full name</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileName}</span>
+                      )}
+                    </div>
+
+                    {/* Designation */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Briefcase size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Designation</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileDesignation}
+                          onChange={(e) => setProfileDesignation(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileDesignation}</span>
+                      )}
+                    </div>
+
+                    {/* ICAI Membership */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Award size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">ICAI membership</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileIcaiMembership}
+                          onChange={(e) => setProfileIcaiMembership(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileIcaiMembership}</span>
+                      )}
+                    </div>
+
+                    {/* Member Since */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Calendar size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Member since</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileMemberSince}
+                          onChange={(e) => setProfileMemberSince(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileMemberSince}</span>
+                      )}
+                    </div>
+
+                    {/* Office Branch */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <MapPin size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Office branch</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileOfficeBranch}
+                          onChange={(e) => setProfileOfficeBranch(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileOfficeBranch}</span>
+                      )}
+                    </div>
                   </div>
-                </form>
-              )}
-            </div>
+                </div>
+
+                {/* CONTACT DETAILS CARD */}
+                <div className="bg-cardBg border border-borderCustom rounded-2xl p-5 shadow-sm space-y-4">
+                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-borderCustom/60">
+                    <Mail size={14} className="text-primaryBlue" />
+                    Contact
+                  </h3>
+                  <div className="divide-y divide-borderCustom/60">
+                    {/* Email */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Mail size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Email</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="email"
+                          value={profileEmail}
+                          onChange={(e) => setProfileEmail(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right truncate max-w-[170px]" title={profileEmail}>{profileEmail}</span>
+                      )}
+                    </div>
+
+                    {/* Direct Phone */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Phone size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Direct phone</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profilePhone}
+                          onChange={(e) => setProfilePhone(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profilePhone}</span>
+                      )}
+                    </div>
+
+                    {/* LinkedIn */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 shrink-0">
+                          <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                          <rect x="2" y="9" width="4" height="12"></rect>
+                          <circle cx="4" cy="4" r="2"></circle>
+                        </svg>
+                        <span className="text-xs font-medium">LinkedIn</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileLinkedin}
+                          onChange={(e) => setProfileLinkedin(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right truncate max-w-[170px]" title={profileLinkedin}>{profileLinkedin}</span>
+                      )}
+                    </div>
+
+                    {/* Location */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <MapPin size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Location</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileLocation}
+                          onChange={(e) => setProfileLocation(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileLocation}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ADMIN DETAILS CARD */}
+                <div className="bg-cardBg border border-borderCustom rounded-2xl p-5 shadow-sm space-y-4">
+                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-1.5 pb-2 border-b border-borderCustom/60">
+                    <Shield size={14} className="text-primaryBlue" />
+                    Admin Details
+                  </h3>
+                  <div className="divide-y divide-borderCustom/60">
+                    {/* Role */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Shield size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Role</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">Super Administrator</span>
+                    </div>
+
+                    {/* Team Assigned */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Users size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Team assigned</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileTeamAssigned}
+                          onChange={(e) => setProfileTeamAssigned(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileTeamAssigned}</span>
+                      )}
+                    </div>
+
+                    {/* Custom Badge */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Award size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Custom badge</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileBadge}
+                          onChange={(e) => setProfileBadge(e.target.value)}
+                          placeholder="e.g. FCA"
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileBadge || 'None'}</span>
+                      )}
+                    </div>
+
+                    {/* Joined Firm */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Calendar size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Joined firm</span>
+                      </div>
+                      {editing ? (
+                        <input
+                          type="text"
+                          value={profileJoinedFirm}
+                          onChange={(e) => setProfileJoinedFirm(e.target.value)}
+                          className="bg-background dark:bg-slate-900 border border-borderCustom rounded-lg px-2.5 py-1.5 text-xs font-semibold text-right text-foreground focus:outline-none focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 w-44"
+                          required
+                        />
+                      ) : (
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 text-right">{profileJoinedFirm}</span>
+                      )}
+                    </div>
+
+                    {/* Last Active */}
+                    <div className="py-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-2.5 text-slate-500 dark:text-slate-400">
+                        <Clock size={14} className="text-slate-400" />
+                        <span className="text-xs font-medium">Last active</span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-650 dark:text-emerald-400 text-right">Active now</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
 
             {/* Security Change Password Settings */}
             <SecuritySettings />
+
+            {/* Authorized Dashboard Access Control */}
+            <div className="bg-cardBg border border-borderCustom rounded-2xl p-6 relative overflow-hidden shadow-sm transition-all duration-300 hover:shadow-md">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primaryBlue/5 rounded-full blur-3xl"></div>
+              
+              <h2 className="text-base md:text-lg font-forum font-bold text-primaryBlue mb-1 flex items-center gap-2.5">
+                <Users size={18} className="text-primaryBlue/80" />
+                Authorized Dashboard Access
+              </h2>
+              <p className="text-[11px] text-slate-500 mb-6 dark:text-slate-400">
+                Manage administrators allowed to log in. Emails not on this list will be denied entry to the dashboard.
+              </p>
+
+              {allowedEmailsError && (
+                <div className="mb-5 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-955 border border-rose-250 dark:border-rose-900/30 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2 animate-fade-in shadow-sm">
+                  <span className="text-rose-500 font-bold">⚠️</span>
+                  <span>{allowedEmailsError}</span>
+                </div>
+              )}
+
+              {allowedEmailsSuccess && (
+                <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2 animate-fade-in shadow-sm">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span>{allowedEmailsSuccess}</span>
+                </div>
+              )}
+
+              {/* Add New Allowed Email Form */}
+              <form onSubmit={handleAddAllowedEmail} className="flex flex-col sm:flex-row gap-3 mb-6">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Mail size={14} />
+                  </div>
+                  <input
+                    type="email"
+                    value={newAllowedEmail}
+                    onChange={(e) => setNewAllowedEmail(e.target.value)}
+                    placeholder="new-admin@mrnp.in"
+                    className="w-full pl-9 pr-4 py-2.5 bg-background border border-borderCustom focus:border-primaryBlue focus:ring-1 focus:ring-primaryBlue/20 focus:outline-none transition rounded-lg text-xs text-foreground font-semibold"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addAllowedEmailLoading}
+                  className="bg-primaryBlue hover:opacity-95 disabled:opacity-50 text-white font-semibold text-xs py-2.5 px-6 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg flex items-center justify-center gap-1.5 cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                >
+                  {addAllowedEmailLoading ? 'Adding...' : (
+                    <>
+                      <Plus size={14} />
+                      Authorize Email
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Allowed Emails list */}
+              <div className="border border-borderCustom rounded-xl overflow-hidden bg-background/30">
+                <div className="px-4 py-2.5 bg-background border-b border-borderCustom text-[10px] uppercase font-bold tracking-wider text-slate-500 flex justify-between">
+                  <span>Authorized Administrator Email</span>
+                  <span>Actions</span>
+                </div>
+                
+                {allowedEmailsLoading ? (
+                  <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-primaryBlue" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading authorized access records...
+                  </div>
+                ) : allowedEmails.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400 italic">
+                    No authorized emails registered. All users will be allowed entry.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-borderCustom max-h-60 overflow-y-auto">
+                    {allowedEmails.map((item: any) => {
+                      const isSelf = user?.email?.toLowerCase() === item.email?.toLowerCase();
+                      return (
+                        <div key={item._id || item.id} className="px-4 py-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                          <div className="flex items-center gap-2.5 overflow-hidden pr-4">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isSelf ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600' : 'bg-primaryBlue/5 text-primaryBlue'}`}>
+                              <Mail size={12} />
+                            </div>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate select-all">{item.email}</span>
+                            {isSelf && (
+                              <span className="inline-flex px-1.5 py-0.5 text-[8px] uppercase font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 rounded border border-emerald-200/50">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div>
+                            {isSelf ? (
+                              <span className="text-[10px] text-slate-400 font-semibold italic select-none">Protected</span>
+                            ) : (
+                              <button
+                                onClick={() => handleDeleteAllowedEmail(item._id || item.id)}
+                                disabled={deleteAllowedEmailLoading === (item._id || item.id)}
+                                className="p-1.5 rounded-lg border border-borderCustom hover:border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-955 text-slate-400 hover:text-rose-650 transition duration-150 cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+                                title="Revoke Access Authorization"
+                              >
+                                {deleteAllowedEmailLoading === (item._id || item.id) ? (
+                                  <svg className="animate-spin h-3.5 w-3.5 text-rose-600" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                ) : (
+                                  <Trash2 size={13} />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

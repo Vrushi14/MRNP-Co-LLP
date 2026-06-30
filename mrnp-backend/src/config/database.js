@@ -4,6 +4,9 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const Job = require('../models/Job');
 const Service = require('../models/Service');
 const About = require('../models/About');
+const CareersPage = require('../models/CareersPage');
+const User = require('../models/User');
+const AllowedEmail = require('../models/AllowedEmail');
 
 const defaultServices = [
   {
@@ -400,6 +403,38 @@ const connectDB = async () => {
       }
     } catch (seedErr) {
       console.error('Error seeding default About page content:', seedErr);
+    }
+
+    // Seed default Careers page content if not present
+    try {
+      const careersCount = await CareersPage.countDocuments();
+      if (careersCount === 0) {
+        console.log('No CareersPage document found in database. Seeding default Careers content...');
+        await CareersPage.create({});
+        console.log('Default CareersPage content seeded successfully!');
+      }
+    } catch (seedErr) {
+      console.error('Error seeding default Careers page content:', seedErr);
+    }
+
+    // Seed Allowed Emails list with existing admin users if empty
+    try {
+      const allowedCount = await AllowedEmail.countDocuments();
+      if (allowedCount === 0) {
+        console.log('No allowed emails found. Seeding AllowedEmail table with existing admin users...');
+        const users = await User.find({});
+        if (users.length > 0) {
+          const emailsToInsert = users.map(u => ({ email: u.email.toLowerCase() }));
+          await AllowedEmail.insertMany(emailsToInsert);
+          console.log(`Seeded AllowedEmail table with ${emailsToInsert.length} existing admin emails.`);
+        } else {
+          // Fallback: seed default email
+          await AllowedEmail.create({ email: 'admin@mrnp.in' });
+          console.log('Seeded AllowedEmail table with default admin@mrnp.in.');
+        }
+      }
+    } catch (seedErr) {
+      console.error('Error seeding allowed emails:', seedErr);
     }
   } catch (error) {
     console.error('MongoDB connection error:', error.message);

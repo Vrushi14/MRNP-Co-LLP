@@ -48,10 +48,10 @@ export const apiClient = {
     getProfile: () =>
       apiClient.request('/user/profile', { method: 'GET' }),
 
-    updateProfile: (name, email) =>
+    updateProfile: (profileData) =>
       apiClient.request('/user/profile', {
         method: 'PUT',
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify(profileData),
       }),
 
     changePassword: (currentPassword, newPassword) =>
@@ -59,6 +59,18 @@ export const apiClient = {
         method: 'PUT',
         body: JSON.stringify({ currentPassword, newPassword }),
       }),
+
+    getAllowedEmails: () =>
+      apiClient.request('/user/allowed-emails', { method: 'GET' }),
+
+    addAllowedEmail: (email) =>
+      apiClient.request('/user/allowed-emails', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+
+    deleteAllowedEmail: (id) =>
+      apiClient.request(`/user/allowed-emails/${id}`, { method: 'DELETE' }),
   },
 
   careers: {
@@ -71,6 +83,23 @@ export const apiClient = {
     getApplications: () =>
       apiClient.request('/careers/applications', {
         method: 'GET',
+      }),
+
+    getContent: () =>
+      apiClient.request('/careers/content', {
+        method: 'GET',
+      }),
+
+    updateContent: (contentData) =>
+      apiClient.request('/careers/content', {
+        method: 'PUT',
+        body: contentData,
+      }),
+
+    uploadImage: (formData) =>
+      apiClient.request('/careers/upload', {
+        method: 'POST',
+        body: formData,
       }),
   },
 

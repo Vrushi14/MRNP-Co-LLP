@@ -61,7 +61,7 @@ export default function DashboardWidgets({
               Recent Applications
             </h3>
             <button
-              onClick={() => setActiveTab('applications')}
+              onClick={() => setActiveTab('jobs')}
               className="text-xs text-primaryBlue hover:underline flex items-center gap-1 cursor-pointer font-semibold"
             >
               View pipeline

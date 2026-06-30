@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { submitApplication, getApplications } = require('../controllers/careerController');
+const { getCareersPageContent, updateCareersPageContent, uploadCareersImage } = require('../controllers/careersPageController');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -56,7 +57,52 @@ const handleUpload = (req, res, next) => {
   });
 };
 
+// Storage configuration for Careers Images
+const imageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const rawExt = path.extname(file.originalname);
+    const ext = rawExt.toLowerCase().replace(/[^.a-z0-9]/g, '');
+    cb(null, 'careers-' + uniqueSuffix + ext);
+  }
+});
+
+const imageFileFilter = (req, file, cb) => {
+  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.svg'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedExtensions.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only .png, .jpg, .jpeg, .webp and .svg image files are allowed'), false);
+  }
+};
+
+const uploadImage = multer({
+  storage: imageStorage,
+  fileFilter: imageFileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+const handleImageUpload = (req, res, next) => {
+  const uploadSingle = uploadImage.single('image');
+  
+  uploadSingle(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+};
+
 router.post('/apply', handleUpload, submitApplication);
 router.get('/applications', authenticateToken, getApplications);
+
+// Content management routes
+router.get('/content', getCareersPageContent);
+router.put('/content', authenticateToken, updateCareersPageContent);
+router.post('/upload', authenticateToken, handleImageUpload, uploadCareersImage);
 
 module.exports = router;
