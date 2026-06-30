@@ -124,7 +124,7 @@ export default function ContactPage() {
                       {office.address}
                     </p>
                     <div className="flex gap-2 items-center">
-                      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 border-2 border-[#B4B4B4] rounded-full hover:border-primaryBlue transition-all duration-300 group cursor-pointer min-w-0 flex-1 overflow-hidden">
+                      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 border-2 border-[#B4B4B4] rounded-full hover:border-primaryBlue transition-all duration-300 group cursor-pointer min-w-0 flex-1 lg:flex-none lg:max-w-max overflow-hidden">
                         <span className="font-instrument text-xs sm:text-base lg:text-lg text-primaryBlue flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
                           {office.phone && (
                             <>
