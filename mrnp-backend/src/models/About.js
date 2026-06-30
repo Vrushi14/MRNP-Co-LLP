@@ -12,7 +12,8 @@ const aboutPartnerSchema = new mongoose.Schema({
   degree: { type: String, default: '' },
   image: { type: String, default: '' },
   email: { type: String, default: '' },
-  bio: { type: String, default: '' }
+  bio: { type: String, default: '' },
+  isActive: { type: Boolean, default: true }
 });
 
 const aboutSchema = new mongoose.Schema(

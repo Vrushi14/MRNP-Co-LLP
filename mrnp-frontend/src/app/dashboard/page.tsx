@@ -1976,7 +1976,7 @@ MRNP Managing Partners`);
                     <h3 className="font-forum text-base font-bold text-primaryBlue dark:text-white">4. Partners & Team Members</h3>
                     <button
                       type="button"
-                      onClick={() => setAboutPartners([...aboutPartners, { name: '', role: '', degree: '', image: '', email: '', bio: '' }])}
+                      onClick={() => setAboutPartners([...aboutPartners, { name: '', role: '', degree: '', image: '', email: '', bio: '', isActive: true }])}
                       className="px-3 py-1.5 bg-primaryBlue/5 hover:bg-primaryBlue hover:text-white border border-primaryBlue/10 text-primaryBlue text-[11px] font-bold rounded-lg transition cursor-pointer flex items-center gap-1"
                     >
                       <Plus size={12} />
@@ -1992,18 +1992,37 @@ MRNP Managing Partners`);
                     <div className="space-y-4">
                       {aboutPartners.map((pt, idx) => (
                         <div key={idx} className="bg-background/30 border border-borderCustom p-4 rounded-xl relative space-y-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = [...aboutPartners];
-                              updated.splice(idx, 1);
-                              setAboutPartners(updated);
-                            }}
-                            className="absolute top-4 right-4 text-xs text-rose-500 hover:text-rose-600 font-bold flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <Trash2 size={12} />
-                            Remove
-                          </button>
+                          <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...aboutPartners];
+                                updated.splice(idx, 1);
+                                setAboutPartners(updated);
+                              }}
+                              className="text-xs text-rose-500 hover:text-rose-600 font-bold flex items-center gap-0.5 cursor-pointer"
+                            >
+                              <Trash2 size={12} />
+                              Remove
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...aboutPartners];
+                                updated[idx].isActive = updated[idx].isActive === false ? true : false;
+                                setAboutPartners(updated);
+                              }}
+                              className={`text-[10px] font-bold flex items-center gap-1 cursor-pointer px-2.5 py-1 rounded-full border transition-all ${
+                                pt.isActive === false
+                                  ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/30'
+                                  : 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900/30'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${pt.isActive === false ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
+                              {pt.isActive === false ? 'Disabled' : 'Enabled'}
+                            </button>
+                          </div>
 
                           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                             {/* Profile Image Column */}

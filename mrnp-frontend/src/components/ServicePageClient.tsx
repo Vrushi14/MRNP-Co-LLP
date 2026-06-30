@@ -6,8 +6,25 @@ import Image from "next/image";
 import { motion, LayoutGroup } from "framer-motion";
 import { servicesData } from "@/data/services";
 
+const ORDERED_SLUGS = [
+  "audit-and-assurance",
+  "Business-Consultancy-and-Advisory",
+  "Changes-in-Accounting-Standards-and-Legislations",
+  "Governance-and-Risk-Management",
+  "management-recommendations",
+  "Tax-Consultancy"
+];
+
+const sortServices = (list: any[]) => {
+  return [...list].sort((a, b) => {
+    const indexA = ORDERED_SLUGS.findIndex(slug => slug.toLowerCase() === a.slug?.toLowerCase());
+    const indexB = ORDERED_SLUGS.findIndex(slug => slug.toLowerCase() === b.slug?.toLowerCase());
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+};
+
 export function ServiceSidebar({ currentSlug }: { currentSlug: string }) {
-  const [services, setServices] = useState<any[]>(servicesData);
+  const [services, setServices] = useState<any[]>(() => sortServices(servicesData));
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -17,7 +34,7 @@ export function ServiceSidebar({ currentSlug }: { currentSlug: string }) {
         if (res.ok) {
           const data = await res.json();
           if (data && data.services && data.services.length > 0) {
-            setServices(data.services);
+            setServices(sortServices(data.services));
           }
         }
       } catch (err) {
