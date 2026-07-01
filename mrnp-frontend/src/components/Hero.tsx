@@ -19,7 +19,7 @@ export default function Hero() {
       <div className="absolute inset-0 bg-black/20" />
       <div className="container w-full max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-16 2xl:px-0">
         <div className="relative z-10 max-w-7xl mx-auto text-center space-y-6 mt-10 md:py-40">
-          <h1 className="font-forum text-4xl md:text-5xl lg:text-6xl xl:text-[5rem] md:leading-tight lg:leading-[5rem] xl:leading-[6.5rem] pb-2">
+          <h1 className="font-forum text-4xl md:text-5xl lg:text-6xl xl:text-[5rem] leading-none pb-0">
             <span className="block animate-fade-in-up bg-gradient-to-b from-white via-white to-white/60 bg-clip-text text-transparent">
               History of expertise.
             </span>
@@ -27,7 +27,7 @@ export default function Hero() {
               Reputation for excellence.
             </span>
           </h1>
-          <p className="font-instrument text-base md:text-lg lg:text-xl xl:text-2xl text-white max-w-5xl mx-auto whitespace-pre-line leading-relaxed animate-fade-in-up animation-delay-200">
+          <p className="font-instrument !text-center !mt-3 text-base md:text-lg lg:text-xl xl:text-2xl text-white max-w-5xl mx-auto whitespace-pre-line leading-relaxed animate-fade-in-up animation-delay-200">
             Smart approaches to solution with exceptional service. Talent and
             expertise necessary to meet our clients&apos; needs in an ever-changing
             and fast-paced environment.
