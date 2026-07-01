@@ -11,28 +11,28 @@ import HereToHelp from "@/components/HereToHelp";
 const offices = [
   {
     city: "Bangalore",
-    address: "6, 1st Floor, 13th Main, 3rd Cross, M.S. Ramaiah Enclave, B/h Nagasandra Metro Station, Bangalore - 560073",
+    address: "6, 1st Floor, 13th Main, 3rd Cross, M.S. Ramaiah Enclave, \nB/h Nagasandra Metro Station, Bangalore - 560073",
     phone: "8095290539",
     email: "bangalore@mrnp.in",
     mapQuery: "MRNP & CO LLP Bangalore",
   },
   {
     city: "Ahmedabad",
-    address: "Infinity Tower, A - 809, Corporate Rd, near Ramada Hotel, Prahlad Nagar, Ahmedabad-380015",
+    address: "Infinity Tower, A - 809, Corporate Rd, near Ramada Hotel, \nPrahlad Nagar, Ahmedabad-380015",
     phone: null,
     email: "ahmedabad@mrnp.in",
     mapQuery: "M R N P & Co. LLP Ahmedabad",
   },
   {
     city: "Surat",
-    address: "422-A, Square One, Althan Bhimrad Canal Road, 2nd VIP Road, Bhimrad, Surat-395017",
+    address: "422-A, Square One, Althan Bhimrad Canal Road, 2nd VIP Road, \nBhimrad, Surat-395017",
     phone: "6354537761",
     email: "surat@mrnp.in",
     mapQuery: "MRNP & CO LLP Surat",
   },
   {
     city: "Vadodara",
-    address: "301-A, Lotus Aura-2, Opp. Lilleria Party Plot, Sama-Savli Rd, Near IOCL Petrol Pump, Vadodara-390024",
+    address: "301-A, Lotus Aura-2, Opp. Lilleria Party Plot, Sama-Savli Rd, \nNear IOCL Petrol Pump, Vadodara-390024",
     phone: "6352162199",
     email: "baroda@mrnp.in",
     mapQuery: "MRNP AND CO LLP VADODARA",
@@ -46,14 +46,14 @@ const offices = [
   },
   {
     city: "Gandhidham",
-    address: "Iris House, 2nd Floor, Plot No. 39, Ward 7/C, Opp. P.N Amersy School, Gurukul Road, Gandhidham (Kutch) - 370201",
+    address: "Iris House, 2nd Floor, Plot No. 39, Ward 7/C, Opp. P.N Amersy \nSchool, Gurukul Road, Gandhidham (Kutch) - 370201",
     phone: "9157971928",
     email: "gandhidham@mrnp.in",
     mapQuery: "MRNP & CO LLP (CA) Gandhidham",
   },
   {
     city: "Bhuj",
-    address: "3, 1st Floor, Royal Plaza, Nr. Cargo Honda Showroom, College Road, Bhuj (Kutch) - 370001",
+    address: "3, 1st Floor, Royal Plaza, Nr. Cargo Honda Showroom, \nCollege Road, Bhuj (Kutch) - 370001",
     phone: "8200523428",
     email: "bhuj@mrnp.in",
     mapQuery: "Royal Plaza, College Road, Bhuj, Gujarat 370001",
@@ -85,7 +85,7 @@ export default function ContactPage() {
       {/* Content Section */}
       <section className="bg-white flex justify-center items-center py-12 lg:py-24">
         <div className="container w-full max-w-[1440px] px-4 sm:px-6 lg:px-8 xl:px-16 2xl:px-0">
-          
+
           <div className="flex items-center gap-10 md:gap-20 lg:gap-40 mb-12 lg:mb-16">
             <h2 className="font-forum text-3xl lg:text-4xl xl:text-5xl text-primaryBlue whitespace-nowrap">
               Our Offices Across India
@@ -95,7 +95,7 @@ export default function ContactPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
             {/* Offices List */}
-            <motion.div 
+            <motion.div
               variants={{
                 hidden: {},
                 visible: { transition: { staggerChildren: 0.1 } }
@@ -108,19 +108,19 @@ export default function ContactPage() {
               {offices.map((office, idx) => {
                 const isSelected = selectedOffice.city === office.city;
                 return (
-                  <motion.div 
-                    key={idx} 
+                  <motion.div
+                    key={idx}
                     variants={{
                       hidden: { opacity: 0, y: 30 },
                       visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
                     }}
-                    className="space-y-3 border-l-4 border-transparent pl-4 hover:border-primaryBlue transition-colors duration-[250ms] cursor-pointer" 
+                    className="space-y-3 border-l-4 border-transparent pl-4 hover:border-primaryBlue transition-colors duration-[250ms] cursor-pointer"
                     onClick={() => setSelectedOffice(office)}
                   >
                     <h3 className="font-instrument cursor-pointer text-2xl lg:text-[1.75rem] font-medium text-primaryBlue">
                       {office.city}
                     </h3>
-                    <p className="font-instrument text-base lg:text-lg text-[#191919] leading-relaxed">
+                    <p className="font-instrument text-base lg:text-lg text-[#191919] leading-relaxed whitespace-pre-line">
                       {office.address}
                     </p>
                     <div className="flex gap-2 items-center">
@@ -146,11 +146,10 @@ export default function ContactPage() {
                         </span>
                       </div>
                       <div
-                        className={`p-3 rounded-full border border-[#B4B4B4] cursor-pointer transition-all duration-300 flex items-center justify-center group flex-shrink-0 ${
-                          isSelected
-                            ? "bg-primaryBlue text-white border-primaryBlue"
-                            : "bg-white text-primaryBlue hover:bg-primaryBlue hover:text-white"
-                        }`}
+                        className={`p-3 rounded-full border border-[#B4B4B4] cursor-pointer transition-all duration-300 flex items-center justify-center group flex-shrink-0 ${isSelected
+                          ? "bg-primaryBlue text-white border-primaryBlue"
+                          : "bg-white text-primaryBlue hover:bg-primaryBlue hover:text-white"
+                          }`}
                       >
                         <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
                       </div>
@@ -166,7 +165,7 @@ export default function ContactPage() {
                 <div className="bg-gray-100 rounded-lg overflow-hidden shadow-lg border border-gray-200">
                   <iframe
                     src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedOffice.mapQuery)}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
-                    className="w-full h-[600px] border-0"
+                    className="w-full h-[500px] border-0"
                     loading="lazy"
                     title={`Map of ${selectedOffice.city}`}
                     allowFullScreen
@@ -192,7 +191,7 @@ export default function ContactPage() {
 
         </div>
       </section>
-      
+
       <HereToHelp />
       <Footer />
     </main>
